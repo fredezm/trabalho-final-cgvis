@@ -57,13 +57,6 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 
 ## Limitações esperadas
 
-> [!IMPORTANT]
-> - Coloque aqui uma lista de detalhes visuais ou de interação que
->   aparecem no vídeo e/ou imagens acima, mas que você **não pretende
->   implementar** ou que você **irá implementar parcialmente**.
-> - Para cada item, **explique por que** não será implementado ou por
->   que será implementado parcialmente.
-
 <mark>` - Goleiro: vamos tentar implementar parcialmente o goleiro. Vamos posicionar um objeto na posição do goleiro, porém não temos certeza se iremos animá-lo. Implementar uma inteligência artificial básica que seria capaz de alcançar a bola seria complicado e acho que não está no escopo da disciplina. `</mark>
 
 <mark>`- Zagueiro: não haverá zagueiros além da barreira. A animação do corpo é complexa e acreditamos que ficaria muito tosco fazer isso parcialmente.`</mark>

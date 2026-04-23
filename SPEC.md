@@ -1,89 +1,59 @@
 # Especificação da Implementação
 
-> [!CAUTION]
-> - Você <ins>**não pode utilizar ferramentas de IA para escrever esta
->   especificação**</ins>
-
 ## Integrantes da dupla
 
-- **Aluno 1 - Nome**: <mark>`<preencher>`</mark>
-- **Aluno 1 - Cartão UFRGS**: <mark>`<preencher>`</mark>
+- **Aluno 1 - Nome**: <mark>`Frederico Zucchetti Mattiello`</mark>
+- **Aluno 1 - Cartão UFRGS**: <mark>`581041`</mark>
 
-- **Aluno 2 - Nome**: <mark>`<preencher>`</mark>
-- **Aluno 2 - Cartão UFRGS**: <mark>`<preencher>`</mark>
-
+- **Aluno 2 - Nome**: <mark>`André Gatti Wolff`</mark>
+- **Aluno 2 - Cartão UFRGS**: <mark>`578039`</mark>
 ## Detalhes do que será implementado
 
-- **Título do trabalho**: <mark>`<preencher>`</mark>
-- **Parágrafo curto descrevendo o que será implementado**: <mark>`<preencher>`</mark>
+- **Título do trabalho**: <mark>`FUI RAPTADO PELO ABEL BRAGA E AGORA SOU OBRIGADO A BATER FALTAS PELO INTERNACIONAL`</mark>
+- **Parágrafo curto descrevendo o que será implementado**: <mark>`Vamos implementar um jogo que o objetivo é cobrar faltas e acertar o gol. O objetivo é acertar as cobranças. Ao posicionar a bola, o jogador enfrentará alguns desafios: obstáculos e um temporizador. O jogador irá controlar o jogo usando seu mouse e teclado; o mouse controlará o posicionamento da bola e a câmera, enquanto que o teclado controlará a trajetória e força do chute.`</mark>
 
 ## Especificação visual
 
-### Vídeo - Link
+### Vídeos curtos (10 segundos cada) - Links
 
-> [!IMPORTANT]
-> - Coloque aqui um link para um vídeo que mostre a aplicação gráfica
->   de referência que você vai implementar. **Sua implementação deverá
->   ser o mais parecido possível com o que é mostrado no vídeo (mais
->   detalhes abaixo).**
-> - **Você não pode escolher como referência: (1) algum trabalho realizado
->   por outros alunos desta disciplina, em semestres anteriores. (2) Minecraft.**
-> - Por exemplo, você pode colocar um vídeo de um jogo que você gosta,
->   e seu trabalho final será uma re-implementação do jogo.
-> - O vídeo pode ser um link para YouTube, Google Drive, ou arquivo mp4 dentro
->   do próprio repositório. Mas, garanta que qualquer um tenha
->   permissão de acesso ao vídeo através deste link.
-
-<mark>`<preencher>`</mark>
-
-### Vídeo - Timestamp
-
-> [!IMPORTANT]
-> - Coloque aqui um **intervalo de ~30 segundos** do vídeo acima, que
->   será a base de comparação para avaliar se o seu trabalho final
->   conseguiu ou não reproduzir a referência.
-
-- **Timestamp inicial**: <mark>`<preencher>`</mark>
-- **Timestamp final**: <mark>`<preencher>`</mark>
+- **Vídeo 1: Câmera visão da bola**: <mark>`https://www.youtube.com/shorts/9RKJ2QLKOLY`</mark>
+- **Vídeo 2: Câmera visão de cima**: <mark>`https://youtu.be/tqzlbn_Vjgc?si=xT-NXLEPco7OsZzl`</mark>
+- **Vídeo 2: Bola batendo na barreira**: <mark>`https://www.youtube.com/shorts/FGAQR7nO1ag`</mark>
 
 ### Imagens
 
-> [!IMPORTANT]
-> - Coloque aqui **três imagens** capturadas do vídeo acima, que você
->   irá usar como ilustração para as explicações que vêm abaixo.
-
-<mark>`<preencher>`</mark>
+<mark>`https://drive.google.com/drive/u/2/folders/19kucK3grjm4vhRiNBlIvvZ16Wm9lYe5m`</mark>
 
 ## Especificação textual
 
 Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final - Moodle](https://moodle.ufrgs.br/mod/assign/view.php?id=6018620)), escreva um parágrafo **curto** explicando como este requisito será atendido, apontando itens específicos do vídeo/imagens que você incluiu acima que atendem estes requisitos.
 
 ### Malhas poligonais complexas
-<mark>`<preencher>`</mark>
+<mark>`Haverá duas malhas poligonais complexas: a bola e as traves (cilíndros).`</mark>
 
 ### Transformações geométricas controladas pelo usuário
-<mark>`<preencher>`</mark>
+<mark>`O jogador decide de onde será batida a falta. Após decidir de onde baterá, o jogo posiciona a barreira para tentar impedir o jogador de acertar.`</mark>
 
 ### Diferentes tipos de câmeras
-<mark>`<preencher>`</mark>
+<mark>`Visão de cima para posicionar a cobrança e visão em 3ª pessoa da bola para direcionar a cobrança e bater a falta.`</mark>
 
 ### Instâncias de objetos
-<mark>`<preencher>`</mark>
+<mark>`Haverá multiplas instâncias de objetos na barreira. Cada jogador da barreira será um objeto.`</mark>
 
 ### Testes de intersecção
-<mark>`<preencher>`</mark>
+<mark>`A bola não pode atravessar a barreira, a trave e o plano.`</mark>
 
 ### Modelos de Iluminação em todos os objetos
-<mark>`<preencher>`</mark>
+<mark>`Utilizaremos o Modelo de Iluminação de Phong.`</mark>
 
 ### Mapeamento de texturas em todos os objetos
-<mark>`<preencher>`</mark>
+<mark>`Sim, na bola, trave e campo.`</mark>
 
 ### Movimentação com curva Bézier cúbica
-<mark>`<preencher>`</mark>
+<mark>`A bola se movimentará usando uma curva de Bézier cúbica.`</mark>
 
 ### Animações baseadas no tempo ($\Delta t$)
-<mark>`<preencher>`</mark>
+<mark>`A bola se movimentará e a barreira ocasionalmente pulará.`</mark>
 
 ## Limitações esperadas
 
@@ -94,4 +64,8 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 > - Para cada item, **explique por que** não será implementado ou por
 >   que será implementado parcialmente.
 
-<mark>`<preencher>`</mark>
+<mark>` - Goleiro: vamos tentar implementar parcialmente o goleiro. Vamos posicionar um objeto na posição do goleiro, porém não temos certeza se iremos animá-lo. Implementar uma inteligência artificial básica que seria capaz de alcançar a bola seria complicado e acho que não está no escopo da disciplina. `</mark>
+
+<mark>`- Zagueiro: não haverá zagueiros além da barreira. A animação do corpo é complexa e acreditamos que ficaria muito tosco fazer isso parcialmente.`</mark>
+
+<mark>` - Jogador batendo a falta: não implementaremos o jogador que baterá a falta. Mesma explicação dos zagueiros.`</mark>

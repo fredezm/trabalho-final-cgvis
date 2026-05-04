@@ -31,6 +31,8 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 ### Malhas poligonais complexas
 <mark>`Haverá duas malhas poligonais complexas: a bola e as traves (cilíndros).`</mark>
 
+> Comentário Professor: Aqui é essencial também ter um modelo geométrico para o jogador que chuta, ou para os jogadores da barreira.
+
 ### Transformações geométricas controladas pelo usuário
 <mark>`O jogador decide de onde será batida a falta. Após decidir de onde baterá, o jogo posiciona a barreira para tentar impedir o jogador de acertar.`</mark>
 
@@ -52,12 +54,16 @@ Para cada um dos requisitos abaixo (detalhados no [Enunciado do Trabalho final -
 ### Movimentação com curva Bézier cúbica
 <mark>`A bola se movimentará usando uma curva de Bézier cúbica.`</mark>
 
+> Comentário Professor: Já pensaram e como irão modificar a curva de acordo com o "ponto" na bola onde é feito o chute? É um problema interessante.
+
 ### Animações baseadas no tempo ($\Delta t$)
 <mark>`A bola se movimentará e a barreira ocasionalmente pulará.`</mark>
 
 ## Limitações esperadas
 
 <mark>` - Goleiro: vamos tentar implementar parcialmente o goleiro. Vamos posicionar um objeto na posição do goleiro, porém não temos certeza se iremos animá-lo. Implementar uma inteligência artificial básica que seria capaz de alcançar a bola seria complicado e acho que não está no escopo da disciplina. `</mark>
+
+> Comentário Professor: Uma lógica simples para o goleiro "IA" seria: se movimenta na direção da bola, mas com uma velocidade máxima permitida.
 
 <mark>`- Zagueiro: não haverá zagueiros além da barreira. A animação do corpo é complexa e acreditamos que ficaria muito tosco fazer isso parcialmente.`</mark>
 

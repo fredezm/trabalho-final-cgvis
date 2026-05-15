@@ -70,8 +70,9 @@ void main()
     float U = 0.0;
     float V = 0.0;
 
-	// Coeficiente de refletância difusa
-	vec3 Kd0;
+    // Coeficientes de refletancia difusa e especular
+    vec3 Kd0;
+    vec3 Ks = vec3(0.4);
 
     if ( object_id == SPHERE )
     {
@@ -144,12 +145,23 @@ void main()
         V = texcoords.y;
 
         Kd0 = texture(TextureImage2, vec2(U, V)).rgb; // textura difusa (branca/preta)
+        Ks = texture(TextureImage3, vec2(U, V)).rgb;  // textura especular
     }
 
-    // Equação de Iluminação
-    float lambert = max(0,dot(n,l));
+    // Equação de iluminação (Phong por fragmento)
+    vec3 n_dir = normalize(n.xyz);
+    vec3 l_dir = normalize(l.xyz);
+    vec3 v_dir = normalize(v.xyz);
 
-    color.rgb = Kd0 * (lambert + 0.01);
+    float lambert = max(0.0, dot(n_dir, l_dir));
+    vec3 r_dir = reflect(-l_dir, n_dir);
+    float spec = 0.0;
+    if (lambert > 0.0)
+        spec = pow(max(dot(r_dir, v_dir), 0.0), 32.0);
+
+    vec3 Ka = 0.02 * Kd0;
+
+    color.rgb = Ka + (Kd0 * lambert) + (Ks * spec);
 
     // NOTE: Se você quiser fazer o rendering de objetos transparentes, é
     // necessário:

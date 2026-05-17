@@ -79,11 +79,8 @@ void main()
     float V = 0.0;
 
     // Coeficientes de refletancia difusa e especular
-    vec3 Kd0;
+    vec3 Kd0 = vec3(0.0);
     vec3 Ks = vec3(0.4);
-
-    // Equação de Iluminação
-    float lambert = max(0,dot(n,l));
 
     if ( object_id == SPHERE )
     {
@@ -159,21 +156,6 @@ void main()
         Ks = texture(TextureImage3, vec2(U, V)).rgb;  // textura especular
     }
 
-    // Equação de iluminação (Phong por fragmento)
-    vec3 n_dir = normalize(n.xyz);
-    vec3 l_dir = normalize(l.xyz);
-    vec3 v_dir = normalize(v.xyz);
-
-    float lambert = max(0.0, dot(n_dir, l_dir));
-    vec3 r_dir = reflect(-l_dir, n_dir);
-    float spec = 0.0;
-    if (lambert > 0.0)
-        spec = pow(max(dot(r_dir, v_dir), 0.0), 32.0);
-
-    vec3 Ka = 0.02 * Kd0;
-
-    color.rgb = Ka + (Kd0 * lambert) + (Ks * spec);
-    
     else if ( object_id == GOAL_POLE_IRON )
     {
         U = texcoords.x;
@@ -188,8 +170,14 @@ void main()
         // Usa alpha da rede para transparência (precisa de blending ativado)
         float alpha = texture(TextureImage6, vec2(U, V)).r;
         Kd0 = texture(TextureImage5, vec2(U, V)).rgb;
-        color.rgb = Kd0 * (lambert + 0.01);
-        color.rgb = pow(color.rgb, vec3(1.0)/2.2);
+        vec3 n3 = normalize(n.xyz);
+        vec3 l3 = normalize(l.xyz);
+        vec3 v3 = normalize(v.xyz);
+        vec3 r3 = reflect(-l3, n3);
+        float lambert = max(0.0, dot(n3, l3));
+        float spec    = pow(max(dot(r3, v3), 0.0), 32.0);
+        vec3 Ka = 0.02 * Kd0;
+        color.rgb = pow(Ka + Kd0 * lambert + Ks * spec, vec3(1.0/2.2));
         color.a = alpha;
         return;
     }
@@ -200,7 +188,17 @@ void main()
         Kd0 = texture(TextureImage4, vec2(U, V)).rgb;
     }
 
-    color.rgb = Kd0 * (lambert + 0.01);
+    // Equação de iluminação (Phong por fragmento)
+    vec3 n3 = normalize(n.xyz);
+    vec3 l3 = normalize(l.xyz);
+    vec3 v3 = normalize(v.xyz);
+    vec3 r3 = reflect(-l3, n3);
+
+    float lambert = max(0.0, dot(n3, l3));
+    float spec    = pow(max(dot(r3, v3), 0.0), 32.0);
+    vec3 Ka = 0.02 * Kd0;
+
+    color.rgb = Ka + (Kd0 * lambert) + (Ks * spec);
 
     // NOTE: Se você quiser fazer o rendering de objetos transparentes, é
     // necessário:
@@ -219,5 +217,4 @@ void main()
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
     color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
-} 
-
+}

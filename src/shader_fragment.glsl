@@ -22,7 +22,11 @@ uniform mat4 projection;
 #define SPHERE 0
 #define BUNNY  1
 #define PLANE  2
+
 #define FOOTBALL 3
+#define GOAL_POLE_IRON 4
+#define GOAL_NET       5
+#define GOAL_POLE      6
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -32,8 +36,12 @@ uniform vec4 bbox_max;
 // Variáveis para acesso das imagens de textura
 uniform sampler2D TextureImage0;
 uniform sampler2D TextureImage1;
+
 uniform sampler2D TextureImage2;
 uniform sampler2D TextureImage3;
+uniform sampler2D TextureImage4;
+uniform sampler2D TextureImage5;
+uniform sampler2D TextureImage6;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -72,6 +80,9 @@ void main()
 
 	// Coeficiente de refletância difusa
 	vec3 Kd0;
+
+    // Equação de Iluminação
+    float lambert = max(0,dot(n,l));
 
     if ( object_id == SPHERE )
     {
@@ -130,8 +141,8 @@ void main()
     else if ( object_id == PLANE )
     {
         // Coordenadas de textura do plano, obtidas do arquivo OBJ.
-        U = texcoords.x;
-        V = texcoords.y;
+        U = texcoords.x * 10.0;
+        V = texcoords.y * 10.0;
 
 		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
 		Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
@@ -146,8 +157,31 @@ void main()
         Kd0 = texture(TextureImage2, vec2(U, V)).rgb; // textura difusa (branca/preta)
     }
 
-    // Equação de Iluminação
-    float lambert = max(0,dot(n,l));
+    else if ( object_id == GOAL_POLE_IRON )
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage4, vec2(U, V)).rgb;
+    }
+
+    else if ( object_id == GOAL_NET )
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        // Usa alpha da rede para transparência (precisa de blending ativado)
+        float alpha = texture(TextureImage6, vec2(U, V)).r;
+        Kd0 = texture(TextureImage5, vec2(U, V)).rgb;
+        color.rgb = Kd0 * (lambert + 0.01);
+        color.rgb = pow(color.rgb, vec3(1.0)/2.2);
+        color.a = alpha;
+        return;
+    }
+    else if ( object_id == GOAL_POLE )
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage4, vec2(U, V)).rgb;
+    }
 
     color.rgb = Kd0 * (lambert + 0.01);
 

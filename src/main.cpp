@@ -300,10 +300,24 @@ int main(int argc, char* argv[])
 
     // Carregamos duas imagens para serem utilizadas como textura
     LoadTextureImage("../../data/red_brick_diff_1k.jpg");      // TextureImage0
+
     LoadTextureImage("../../data/rocky_terrain_02_diff_1k.jpg"); // TextureImage1
+{
+    GLuint repeat_sampler;
+    glGenSamplers(1, &repeat_sampler);
+    glSamplerParameteri(repeat_sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glSamplerParameteri(repeat_sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glSamplerParameteri(repeat_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glSamplerParameteri(repeat_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindSampler(1, repeat_sampler); // unit 1 = TextureImage1
+}
 
     LoadTextureImage("../../data/Tex-Footballwhite.png"); // TextureImage2
     LoadTextureImage("../../data/Tex-Football-RM.png");   // TextureImage3
+
+    LoadTextureImage("../../data/Pole_color.png");      // TextureImage4
+    LoadTextureImage("../../data/Net.001_color.png");   // TextureImage5
+    LoadTextureImage("../../data/Net.001_alpha.png");   // TextureImage6
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -321,6 +335,10 @@ int main(int argc, char* argv[])
     ObjModel footballmodel("../../data/FootBall.obj");
     ComputeNormals(&footballmodel);
     BuildTrianglesAndAddToVirtualScene(&footballmodel);
+
+    ObjModel goalmodel("../../data/Soccergoal.obj");
+    ComputeNormals(&goalmodel);
+    BuildTrianglesAndAddToVirtualScene(&goalmodel);
 
     if ( argc > 1 )
     {
@@ -386,7 +404,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -10.0f; // Posição do "far plane"
+        float farplane  = -30.0f; // Posição do "far plane"
 
         if (g_UsePerspectiveProjection)
         {
@@ -422,15 +440,18 @@ int main(int argc, char* argv[])
         #define PLANE  2
 
         #define FOOTBALL 3
+        #define GOAL_POLE_IRON  4
+        #define GOAL_NET        5
+        #define GOAL_POLE       6
 
-        // Desenhamos o modelo da esfera
-        model = Matrix_Translate(-1.0f,0.0f,0.0f)
-              * Matrix_Rotate_Z(0.6f)
-              * Matrix_Rotate_X(0.2f)
-              * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, SPHERE);
-        DrawVirtualObject("the_sphere");
+        // // Desenhamos o modelo da esfera
+        // model = Matrix_Translate(-1.0f,0.0f,0.0f)
+        //       * Matrix_Rotate_Z(0.6f)
+        //       * Matrix_Rotate_X(0.2f)
+        //       * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f);
+        // glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        // glUniform1i(g_object_id_uniform, SPHERE);
+        // DrawVirtualObject("the_sphere");
 
         // // Desenhamos o modelo do coelho
         // model = Matrix_Translate(1.0f,0.0f,0.0f)
@@ -440,16 +461,36 @@ int main(int argc, char* argv[])
         // DrawVirtualObject("the_bunny");
 
         // Desenhamos o plano do chão
-        model = Matrix_Translate(0.0f,-1.1f,0.0f);
+        model = Matrix_Translate(0.0f,-1.1f,0.0f)
+              * Matrix_Scale(15.0f, 1.0f, 15.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
 
-        model = Matrix_Translate(1.0f,0.0f,0.0f)
-              * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
+        model = Matrix_Translate(0.0f, -0.7f, 0.0f)
+              * Matrix_Scale(1.0f, 1.0f, 1.0f);
+            //   * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, FOOTBALL);
         DrawVirtualObject("FootBall");
+
+        model = Matrix_Translate(0.0f, -1.1f, -13.0f)
+            * Matrix_Scale(1.5f, 1.5f, 1.5f);
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_POLE_IRON);
+        DrawVirtualObject("pole.001_BezierCurve.001_IronPole");
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_POLE);
+        DrawVirtualObject("Pole_Cube.001_Pole");
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_NET);
+        DrawVirtualObject("Net.001_Plane.003_Net");
+        glDisable(GL_BLEND);
 
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
@@ -619,6 +660,9 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage2"), 2);
 
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6);
     
     glUseProgram(0);
 }

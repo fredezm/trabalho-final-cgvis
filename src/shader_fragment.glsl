@@ -19,12 +19,8 @@ uniform mat4 view;
 uniform mat4 projection;
 
 // Identificador que define qual objeto está sendo desenhado no momento
-#define PLANE  2
-
+#define PLANE    2
 #define FOOTBALL 3
-#define GOAL_POLE_IRON 4
-#define GOAL_NET       5
-#define GOAL_POLE      6
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -34,12 +30,8 @@ uniform vec4 bbox_max;
 // Variáveis para acesso das imagens de textura
 uniform sampler2D TextureImage0;
 uniform sampler2D TextureImage1;
-
 uniform sampler2D TextureImage2;
 uniform sampler2D TextureImage3;
-uniform sampler2D TextureImage4;
-uniform sampler2D TextureImage5;
-uniform sampler2D TextureImage6;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -77,20 +69,21 @@ void main()
     float V = 0.0;
 
     // Coeficientes de refletancia difusa e especular
-    vec3 Kd0 = vec3(0.0);
+    vec3 Kd0;
     vec3 Ks = vec3(0.4);
 
     if ( object_id == PLANE )
     {
         // Coordenadas de textura do plano, obtidas do arquivo OBJ.
-        U = texcoords.x * 10.0;
-        V = texcoords.y * 10.0;
+        U = texcoords.x;
+        V = texcoords.y;
 
 		// Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
 		Kd0 = texture(TextureImage1, vec2(U,V)).rgb;
+        Ks = vec3(0.05);  // Muito pouco reflexo para o chão
     }
 
-    else if ( object_id == FOOTBALL )
+    if ( object_id == FOOTBALL )
     {
         // Usa as coordenadas UV que vieram do arquivo OBJ
         U = texcoords.x;
@@ -100,46 +93,17 @@ void main()
         Ks = texture(TextureImage3, vec2(U, V)).rgb;  // textura especular
     }
 
-    else if ( object_id == GOAL_POLE_IRON )
-    {
-        U = texcoords.x;
-        V = texcoords.y;
-        Kd0 = texture(TextureImage4, vec2(U, V)).rgb;
-    }
-
-    else if ( object_id == GOAL_NET )
-    {
-        U = texcoords.x;
-        V = texcoords.y;
-        // Usa alpha da rede para transparência (precisa de blending ativado)
-        float alpha = texture(TextureImage6, vec2(U, V)).r;
-        Kd0 = texture(TextureImage5, vec2(U, V)).rgb;
-        vec3 n3 = normalize(n.xyz);
-        vec3 l3 = normalize(l.xyz);
-        vec3 v3 = normalize(v.xyz);
-        vec3 r3 = reflect(-l3, n3);
-        float lambert = max(0.0, dot(n3, l3));
-        float spec    = pow(max(dot(r3, v3), 0.0), 32.0);
-        vec3 Ka = 0.02 * Kd0;
-        color.rgb = pow(Ka + Kd0 * lambert + Ks * spec, vec3(1.0/2.2));
-        color.a = alpha;
-        return;
-    }
-    else if ( object_id == GOAL_POLE )
-    {
-        U = texcoords.x;
-        V = texcoords.y;
-        Kd0 = texture(TextureImage4, vec2(U, V)).rgb;
-    }
-
     // Equação de iluminação (Phong por fragmento)
-    vec3 n3 = normalize(n.xyz);
-    vec3 l3 = normalize(l.xyz);
-    vec3 v3 = normalize(v.xyz);
-    vec3 r3 = reflect(-l3, n3);
+    vec3 n_dir = normalize(n.xyz);
+    vec3 l_dir = normalize(l.xyz);
+    vec3 v_dir = normalize(v.xyz);
 
-    float lambert = max(0.0, dot(n3, l3));
-    float spec    = pow(max(dot(r3, v3), 0.0), 32.0);
+    float lambert = max(0.0, dot(n_dir, l_dir));
+    vec3 r_dir = reflect(-l_dir, n_dir);
+    float spec = 0.0;
+    if (lambert > 0.0)
+        spec = pow(max(dot(r_dir, v_dir), 0.0), 32.0);
+
     vec3 Ka = 0.02 * Kd0;
 
     color.rgb = Ka + (Kd0 * lambert) + (Ks * spec);
@@ -161,4 +125,5 @@ void main()
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
     color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
-}
+} 
+

@@ -458,8 +458,9 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
-
-          model = Matrix_Translate(g_BallPosX, -0.7f, g_BallPosZ)
+        
+        // Desenho bola de futebol
+        model = Matrix_Translate(g_BallPosX, -0.7f, g_BallPosZ)
               * Matrix_Scale(1.0f, 1.0f, 1.0f);
             //   * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));

@@ -49,6 +49,10 @@
 #include "utils.h"
 #include "matrices.h"
 
+// Constantes
+#define M_PI   3.14159265358979323846
+#define M_PI_2 1.57079632679489661923
+
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
 struct ObjModel
@@ -198,6 +202,15 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.5f; // Distância da câmera para a origem
+// Flag para modo de visão aérea e variáveis para restaurar a câmera
+bool g_AerialView = false;
+float g_PrevCameraTheta = 0.0f;
+float g_PrevCameraPhi = 0.0f;
+float g_PrevCameraDistance = 3.5f;
+// Posição da bola no plano do chão (X,Z). 
+float g_BallPosX = 0.0f;
+float g_BallPosZ = 0.0f;
+
 
 // Variáveis que controlam rotação do antebraço
 float g_ForearmAngleZ = 0.0f;
@@ -320,18 +333,10 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/Net.001_alpha.png");   // TextureImage6
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
-    ObjModel spheremodel("../../data/sphere.obj");
-    ComputeNormals(&spheremodel);
-    BuildTrianglesAndAddToVirtualScene(&spheremodel);
-
-    ObjModel bunnymodel("../../data/bunny.obj");
-    ComputeNormals(&bunnymodel);
-    BuildTrianglesAndAddToVirtualScene(&bunnymodel);
 
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
-
     ObjModel footballmodel("../../data/FootBall.obj");
     ComputeNormals(&footballmodel);
     BuildTrianglesAndAddToVirtualScene(&footballmodel);
@@ -392,7 +397,11 @@ int main(int argc, char* argv[])
         glm::vec4 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
         glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
         glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
-        glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
+        glm::vec4 camera_up_vector;
+        if (g_AerialView)
+            camera_up_vector = glm::vec4(0.0f, 0.0f, -1.0f, 0.0f); // Em top-down, usamos Z como up para evitar colinearidade
+        else
+            camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" padrão apontando para o "céu" (eixo Y global)
 
         // Computamos a matriz "View" utilizando os parâmetros da câmera para
         // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
@@ -417,7 +426,7 @@ int main(int argc, char* argv[])
         {
             // Projeção Ortográfica.
             // Para definição dos valores l, r, b, t ("left", "right", "bottom", "top"),
-            // PARA PROJEÇÃO ORTOGRÁFICA veja slides 219-224 do documento Aula_09_Projecoes.pdf.
+            // PARA PROmakORTOGRÁFICA veja slides 219-224 do documento Aula_09_Projecoes.pdf.
             // Para simular um "zoom" ortográfico, computamos o valor de "t"
             // utilizando a variável g_CameraDistance.
             float t = 1.5f*g_CameraDistance/2.5f;
@@ -435,30 +444,13 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
         glUniformMatrix4fv(g_projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
 
-        #define SPHERE 0
-        #define BUNNY  1
-        #define PLANE  2
 
+        #define PLANE  2
         #define FOOTBALL 3
         #define GOAL_POLE_IRON  4
         #define GOAL_NET        5
         #define GOAL_POLE       6
 
-        // // Desenhamos o modelo da esfera
-        // model = Matrix_Translate(-1.0f,0.0f,0.0f)
-        //       * Matrix_Rotate_Z(0.6f)
-        //       * Matrix_Rotate_X(0.2f)
-        //       * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f);
-        // glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        // glUniform1i(g_object_id_uniform, SPHERE);
-        // DrawVirtualObject("the_sphere");
-
-        // // Desenhamos o modelo do coelho
-        // model = Matrix_Translate(1.0f,0.0f,0.0f)
-        //       * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
-        // glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        // glUniform1i(g_object_id_uniform, BUNNY);
-        // DrawVirtualObject("the_bunny");
 
         // Desenhamos o plano do chão
         model = Matrix_Translate(0.0f,-1.1f,0.0f)
@@ -467,7 +459,7 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
 
-        model = Matrix_Translate(0.0f, -0.7f, 0.0f)
+          model = Matrix_Translate(g_BallPosX, -0.7f, g_BallPosZ)
               * Matrix_Scale(1.0f, 1.0f, 1.0f);
             //   * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
@@ -1198,7 +1190,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         g_CameraPhi   += 0.01f*dy;
     
         // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
-        float phimax = 3.141592f/2;
+        float phimax = M_PI_2; 
         float phimin = -phimax;
     
         if (g_CameraPhi > phimax)
@@ -1339,6 +1331,46 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         LoadShadersFromFiles();
         fprintf(stdout,"Shaders recarregados!\n");
         fflush(stdout);
+    }
+
+    // Se o usuário apertar a tecla F, alternamos o modo de visão aérea (top-down).
+    if (key == GLFW_KEY_F && action == GLFW_PRESS)
+    {
+        if (!g_AerialView)
+        {
+            // Salvamos o estado atual da câmera
+            g_PrevCameraTheta = g_CameraTheta;
+            g_PrevCameraPhi = g_CameraPhi;
+            g_PrevCameraDistance = g_CameraDistance;
+
+            // Ajustamos para visão aérea: câmera acima olhando para baixo
+            g_AerialView = true;
+            g_CameraTheta = 0.0f; 
+            g_CameraPhi = M_PI_2; 
+            g_CameraDistance = 25.0f; 
+        }
+        else
+        {
+            // Restauramos o estado anterior
+            g_AerialView = false;
+            g_CameraTheta = g_PrevCameraTheta;
+            g_CameraPhi = g_PrevCameraPhi;
+            g_CameraDistance = g_PrevCameraDistance;
+        }
+    }
+
+    // Movimento da bola com WASD quando em visão aérea (top-down).
+    if (g_AerialView && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        float step = 0.2f; // valor de deslocamento 
+        if (key == GLFW_KEY_W)
+            g_BallPosZ -= step;
+        if (key == GLFW_KEY_S)
+            g_BallPosZ += step;
+        if (key == GLFW_KEY_A)
+            g_BallPosX -= step;
+        if (key == GLFW_KEY_D)
+            g_BallPosX += step;
     }
 }
 

@@ -468,7 +468,7 @@ int main(int argc, char* argv[])
         DrawVirtualObject("FootBall");
 
         model = Matrix_Translate(0.0f, -1.1f, -13.0f)
-            * Matrix_Scale(1.5f, 1.5f, 1.5f);
+            * Matrix_Scale(3.0f, 1.5f, 1.5f);
 
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, GOAL_POLE_IRON);

@@ -209,7 +209,11 @@ float g_PrevCameraPhi = 0.0f;
 float g_PrevCameraDistance = 3.5f;
 // Posição da bola no plano do chão (X,Z). 
 float g_BallPosX = 0.0f;
+float g_BallPosY = 3.0f;
 float g_BallPosZ = 0.0f;
+
+// Velocidade vertical da bola
+float g_BallVelY = 0.0f; 
 
 
 // Variáveis que controlam rotação do antebraço
@@ -237,6 +241,12 @@ GLint g_bbox_max_uniform;
 
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
+
+//Teste de interseção entre esfera e plano.
+bool TestIntersectionSpherePlane(glm::vec3 sphereCenter, float sphereRadius, float groundY) 
+{
+    return (sphereCenter.y - sphereRadius) <= groundY;
+}
 
 int main(int argc, char* argv[])
 {
@@ -362,6 +372,9 @@ int main(int argc, char* argv[])
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
+    // Marcamos o tempo do último frame para a simulação física independente de FPS
+    float lastTime = (float)glfwGetTime();
+
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -459,10 +472,42 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
         
+        // Colisão entre bola e plano do chão, atualizando a posição e velocidade da bola.
+        // Calcula tempo real decorrido entre os frames
+        float currentTime = (float)glfwGetTime();
+        float deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+
+        if (deltaTime > 0.05f) deltaTime = 0.05f;
+        
+        // Atualização de posição e velocidade da bola
+        g_BallVelY += -9.81f * deltaTime;   
+        g_BallPosY += g_BallVelY * deltaTime; 
+        
+        // Parâmetros para o teste de colisão
+        glm::vec3 ballCenter(g_BallPosX, g_BallPosY, g_BallPosZ);
+        float ballRadius = 0.5f;
+
+        // Teste de colisão com o chão
+        float groundHeight = -1.1f;
+        if (TestIntersectionSpherePlane(ballCenter, ballRadius, groundHeight)) 
+        {
+            // Empurra a bola para a superfície do chão 
+            g_BallPosY = groundHeight + ballRadius; 
+            
+            // Quique da bola
+            g_BallVelY = -g_BallVelY * 0.7f; 
+            
+            // Se a velocidade for muito baixa, zera para a bola parar de tremer
+            if (g_BallVelY < 0.1f && g_BallVelY > -0.1f) g_BallVelY = 0.0f; 
+            
+            // Atualiza o centro para os próximos testes
+            ballCenter.y = g_BallPosY; 
+        }
+
         // Desenho bola de futebol
-        model = Matrix_Translate(g_BallPosX, -0.7f, g_BallPosZ)
+        model = Matrix_Translate(g_BallPosX, g_BallPosY, g_BallPosZ)
               * Matrix_Scale(1.0f, 1.0f, 1.0f);
-            //   * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, FOOTBALL);
         DrawVirtualObject("FootBall");

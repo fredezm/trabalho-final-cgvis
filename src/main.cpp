@@ -204,6 +204,7 @@ float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.5f; // Distância da câmera para a origem
 // Flag para modo de visão aérea e variáveis para restaurar a câmera
 bool g_AerialView = false;
+bool g_BallView = false;
 float g_PrevCameraTheta = 0.0f;
 float g_PrevCameraPhi = 0.0f;
 float g_PrevCameraDistance = 3.5f;
@@ -411,10 +412,38 @@ int main(int argc, char* argv[])
         glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
         glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
         glm::vec4 camera_up_vector;
+
+        if (g_BallView)
+        {
+            glm::vec3 ballPosition(g_BallPosX, g_BallPosY, g_BallPosZ);
+            glm::vec3 goalPosition(0.0f, 0.0f, -13.0f);
+
+            glm::vec3 dirToGoal = goalPosition - ballPosition;
+            
+            dirToGoal.y = 0.0f; 
+            dirToGoal = glm::normalize(dirToGoal);
+
+            // Posicionamento da Câmera
+            float distanceBehind = 4.0f; // Distância que a câmera fica atrás da bola
+            float heightAbove = 1.5f;    // Altura da câmera em relação à bola
+            
+            glm::vec3 camPos = ballPosition - (dirToGoal * distanceBehind);
+            camPos.y = ballPosition.y + heightAbove; 
+
+            camera_position_c  = glm::vec4(camPos.x, camPos.y, camPos.z, 1.0f);
+
+            camera_lookat_l    = glm::vec4(goalPosition.x, goalPosition.y + 1.0f, goalPosition.z, 1.0f); 
+            
+            camera_view_vector = camera_lookat_l - camera_position_c;
+            camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+        }
+        else
+        {
         if (g_AerialView)
             camera_up_vector = glm::vec4(0.0f, 0.0f, -1.0f, 0.0f); // Em top-down, usamos Z como up para evitar colinearidade
         else
             camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" padrão apontando para o "céu" (eixo Y global)
+        }
 
         // Computamos a matriz "View" utilizando os parâmetros da câmera para
         // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
@@ -1418,6 +1447,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         if (key == GLFW_KEY_D)
             g_BallPosX += step;
     }
+
+    if (key == GLFW_KEY_C && action == GLFW_PRESS)
+    {
+        g_BallView = !g_BallView;
+    }
+
 }
 
 // Definimos o callback para impressão de erros da GLFW no terminal

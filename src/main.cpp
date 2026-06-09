@@ -202,9 +202,13 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.5f; // Distância da câmera para a origem
-// Flag para modo de visão aérea e variáveis para restaurar a câmera
-bool g_AerialView = false;
-bool g_BallView = false;
+
+// Máquina de estados da câmera.
+// F cicla: CAM_DEFAULT → CAM_AERIAL → CAM_BALL → (por enquanto CAM_DEFAULT)
+enum CameraState { CAM_DEFAULT, CAM_AERIAL, CAM_BALL };
+CameraState g_CameraState = CAM_DEFAULT;
+
+
 float g_PrevCameraTheta = 0.0f;
 float g_PrevCameraPhi = 0.0f;
 float g_PrevCameraDistance = 3.5f;
@@ -242,6 +246,124 @@ GLint g_bbox_max_uniform;
 
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
+
+// -----------------------------------------------------------------------
+// Trajetória de Bézier cúbica para visualização do chute (g_CameraState == CAM_BALL)
+// -----------------------------------------------------------------------
+#define BEZIER_SEGMENTS 60          // nº de segmentos da poligonal aproximada
+
+GLuint g_BezierVAO = 0;            // VAO da linha de trajetória
+GLuint g_BezierVBO = 0;            // VBO com os pontos (atualizado todo frame)
+GLuint g_BezierProgramID = 0;      // Programa de GPU minimalista (só cor sólida)
+
+// Parâmetros da curva (editáveis pelo usuário em g_CameraState == CAM_BALL)
+float g_BezierArcHeight = 0.0f;    
+float g_BezierTargetY   = 0.0f;    
+float g_BezierTargetX   = 0.0f;    
+
+// Shaders inline para a linha — sem iluminação, sem textura, apenas posição → cor
+static const GLchar* const bezier_vertex_src =
+    "#version 330 core\n"
+    "layout(location = 0) in vec4 pos;\n"
+    "uniform mat4 view;\n"
+    "uniform mat4 projection;\n"
+    "void main() { gl_Position = projection * view * pos; }\n";
+
+static const GLchar* const bezier_fragment_src =
+    "#version 330 core\n"
+    "out vec4 color;\n"
+    "void main() { color = vec4(1.0, 0.85, 0.0, 1.0); }\n"; // amarelo dourado
+
+// Cria (na primeira chamada) ou atualiza o VAO/VBO com os pontos da curva.
+// P0 = posição atual da bola, P3 = ponto final (interativo),
+// P1 e P2 são pontos de controle que criam o arco do chute.
+void UpdateBezierTrajectory()
+{
+    glm::vec3 P0(g_BallPosX, g_BallPosY, g_BallPosZ);
+    glm::vec3 P3(g_BezierTargetX, g_BezierTargetY, -13.0f); // ponto final interativo
+
+    // Pontos de controle: P1 sobe com g_BezierArcHeight; P2 usa metade desse valor
+    glm::vec3 dir = P3 - P0;
+    glm::vec3 P1 = P0 + dir * 0.25f + glm::vec3(0.0f, g_BezierArcHeight,        0.0f);
+    glm::vec3 P2 = P0 + dir * 0.75f + glm::vec3(0.0f, g_BezierArcHeight * 0.67f, 0.0f);
+
+    // Amostramos (BEZIER_SEGMENTS + 1) pontos ao longo da curva, t ∈ [0, 1]
+    const int N = BEZIER_SEGMENTS + 1;
+    glm::vec4 pts[N];
+    for (int i = 0; i < N; i++)
+    {
+        float t  = (float)i / (float)BEZIER_SEGMENTS;
+        float u  = 1.0f - t;
+        // Fórmula de Bézier cúbica: B(t) = u³P0 + 3u²tP1 + 3ut²P2 + t³P3
+        glm::vec3 b = u*u*u * P0
+                    + 3.0f*u*u*t * P1
+                    + 3.0f*u*t*t * P2
+                    + t*t*t * P3;
+        pts[i] = glm::vec4(b, 1.0f);
+    }
+
+    if (g_BezierVAO == 0)
+    {
+        glGenVertexArrays(1, &g_BezierVAO);
+        glGenBuffers(1, &g_BezierVBO);
+
+        glBindVertexArray(g_BezierVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, g_BezierVBO);
+        // Alocamos o buffer com tamanho fixo (N pontos × vec4)
+        glBufferData(GL_ARRAY_BUFFER, N * sizeof(glm::vec4), NULL, GL_DYNAMIC_DRAW);
+        // location = 0 → atributo "pos" no vertex shader da linha
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+        glEnableVertexAttribArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+
+    // Atualiza o conteúdo do VBO com os novos pontos calculados
+    glBindBuffer(GL_ARRAY_BUFFER, g_BezierVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, N * sizeof(glm::vec4), pts);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+// Compila um shader inline e retorna seu ID
+static GLuint CompileInlineShader(GLenum type, const GLchar* src)
+{
+    GLuint id = glCreateShader(type);
+    glShaderSource(id, 1, &src, NULL);
+    glCompileShader(id);
+    GLint ok; glGetShaderiv(id, GL_COMPILE_STATUS, &ok);
+    if (!ok)
+    {
+        GLint len = 0; glGetShaderiv(id, GL_INFO_LOG_LENGTH, &len);
+        GLchar* log = new GLchar[len];
+        glGetShaderInfoLog(id, len, &len, log);
+        fprintf(stderr, "Bezier shader compile error:\n%s\n", log);
+        delete[] log;
+    }
+    return id;
+}
+
+// Cria o programa de GPU minimalista para a linha de trajetória
+void InitBezierShaderProgram()
+{
+    GLuint vs = CompileInlineShader(GL_VERTEX_SHADER,   bezier_vertex_src);
+    GLuint fs = CompileInlineShader(GL_FRAGMENT_SHADER, bezier_fragment_src);
+    g_BezierProgramID = glCreateProgram();
+    glAttachShader(g_BezierProgramID, vs);
+    glAttachShader(g_BezierProgramID, fs);
+    glLinkProgram(g_BezierProgramID);
+    GLint ok; glGetProgramiv(g_BezierProgramID, GL_LINK_STATUS, &ok);
+    if (!ok)
+    {
+        GLint len = 0; glGetProgramiv(g_BezierProgramID, GL_INFO_LOG_LENGTH, &len);
+        GLchar* log = new GLchar[len];
+        glGetProgramInfoLog(g_BezierProgramID, len, &len, log);
+        fprintf(stderr, "Bezier program link error:\n%s\n", log);
+        delete[] log;
+    }
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+}
+// -----------------------------------------------------------------------
 
 //Teste de interseção entre esfera e plano.
 bool TestIntersectionSpherePlane(glm::vec3 sphereCenter, float sphereRadius, float groundY) 
@@ -321,6 +443,9 @@ int main(int argc, char* argv[])
     // para renderização. Veja slides 180-200 do documento Aula_03_Rendering_Pipeline_Grafico.pdf.
     //
     LoadShadersFromFiles();
+
+    // Inicializamos o programa de GPU minimalista para a linha de trajetória
+    InitBezierShaderProgram();
 
     // Carregamos duas imagens para serem utilizadas como textura
     LoadTextureImage("../../data/red_brick_diff_1k.jpg");      // TextureImage0
@@ -413,7 +538,7 @@ int main(int argc, char* argv[])
         glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
         glm::vec4 camera_up_vector;
 
-        if (g_BallView)
+        if (g_CameraState == CAM_BALL)
         {
             glm::vec3 ballPosition(g_BallPosX, g_BallPosY, g_BallPosZ);
             glm::vec3 goalPosition(0.0f, 0.0f, -13.0f);
@@ -439,7 +564,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-        if (g_AerialView)
+        if (g_CameraState == CAM_AERIAL)
             camera_up_vector = glm::vec4(0.0f, 0.0f, -1.0f, 0.0f); // Em top-down, usamos Z como up para evitar colinearidade
         else
             camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" padrão apontando para o "céu" (eixo Y global)
@@ -558,6 +683,40 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, GOAL_NET);
         DrawVirtualObject("Net.001_Plane.003_Net");
         glDisable(GL_BLEND);
+
+        // ---------------------------------------------------------------
+        // Renderiza a linha de trajetória de Bézier cúbica (apenas em
+        // g_CameraState == CAM_BALL), mostrando o arco previsto para o chute da bola.
+        // ---------------------------------------------------------------
+        if (g_CameraState == CAM_BALL)
+        {
+            // Atualiza (ou cria) o VAO/VBO com os pontos da curva
+            UpdateBezierTrajectory();
+
+            // Usa o programa de GPU minimalista (sem iluminação/textura)
+            glUseProgram(g_BezierProgramID);
+
+            // Envia as matrizes view e projection ao shader da linha
+            GLint bezier_view_u = glGetUniformLocation(g_BezierProgramID, "view");
+            GLint bezier_proj_u = glGetUniformLocation(g_BezierProgramID, "projection");
+            glUniformMatrix4fv(bezier_view_u, 1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(bezier_proj_u, 1, GL_FALSE, glm::value_ptr(projection));
+
+            // Desabilita o depth test para que a linha apareça sobre os objetos
+            glDisable(GL_DEPTH_TEST);
+
+            glLineWidth(6.0f);
+            glBindVertexArray(g_BezierVAO);
+            glDrawArrays(GL_LINE_STRIP, 0, BEZIER_SEGMENTS + 1);
+            glBindVertexArray(0);
+
+            glEnable(GL_DEPTH_TEST);
+            glLineWidth(1.0f);
+
+            // Retorna ao programa de GPU principal
+            glUseProgram(g_GpuProgramID);
+        }
+        // ---------------------------------------------------------------
 
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
@@ -1316,6 +1475,18 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 // Função callback chamada sempre que o usuário movimenta a "rodinha" do mouse.
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
+    if (g_CameraState == CAM_BALL)
+    {
+        // Em modo g_CameraState == CAM_BALL o scroll controla o pico do arco de Bézier.
+        // Scroll up aumenta, scroll down diminui
+        g_BezierArcHeight += 0.5f * (float)yoffset;
+
+        // Arco minimo e máximo
+        if (g_BezierArcHeight < 0.0f)  g_BezierArcHeight = 0.0f;
+        if (g_BezierArcHeight > 5.0f) g_BezierArcHeight = 5.0f; // quanto a gente tiver a barreira podemos testar o valor maximo pra ficar bom
+        return;
+    }
+
     // Atualizamos a distância da câmera para a origem utilizando a
     // movimentação da "rodinha", simulando um ZOOM.
     g_CameraDistance -= 0.1f*yoffset;
@@ -1408,34 +1579,40 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         fflush(stdout);
     }
 
-    // Se o usuário apertar a tecla F, alternamos o modo de visão aérea (top-down).
+    // Tecla F cicla entre os estados da câmera:
+    //   CAM_DEFAULT → CAM_AERIAL → CAM_BALL → CAM_DEFAULT
     if (key == GLFW_KEY_F && action == GLFW_PRESS)
     {
-        if (!g_AerialView)
+        switch (g_CameraState)
         {
-            // Salvamos o estado atual da câmera
-            g_PrevCameraTheta = g_CameraTheta;
-            g_PrevCameraPhi = g_CameraPhi;
+        case CAM_DEFAULT:
+            // Salva câmera atual e entra em visão aérea
+            g_PrevCameraTheta    = g_CameraTheta;
+            g_PrevCameraPhi      = g_CameraPhi;
             g_PrevCameraDistance = g_CameraDistance;
+            g_CameraTheta    = 0.0f;
+            g_CameraPhi      = M_PI_2;
+            g_CameraDistance = 25.0f;
+            g_CameraState = CAM_AERIAL;
+            break;
 
-            // Ajustamos para visão aérea: câmera acima olhando para baixo
-            g_AerialView = true;
-            g_CameraTheta = 0.0f; 
-            g_CameraPhi = M_PI_2; 
-            g_CameraDistance = 25.0f; 
-        }
-        else
-        {
-            // Restauramos o estado anterior
-            g_AerialView = false;
-            g_CameraTheta = g_PrevCameraTheta;
-            g_CameraPhi = g_PrevCameraPhi;
+        case CAM_AERIAL:
+            // Mantém os parâmetros esféricos do aéreo e entra em visão da bola
+            g_CameraState = CAM_BALL;
+            break;
+
+        case CAM_BALL:
+            // Restaura câmera original e volta ao estado padrão
+            g_CameraTheta    = g_PrevCameraTheta;
+            g_CameraPhi      = g_PrevCameraPhi;
             g_CameraDistance = g_PrevCameraDistance;
+            g_CameraState = CAM_DEFAULT;
+            break;
         }
     }
 
     // Movimento da bola com WASD quando em visão aérea (top-down).
-    if (g_AerialView && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    if (g_CameraState == CAM_AERIAL && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
         float step = 0.2f; // valor de deslocamento 
         if (key == GLFW_KEY_W)
@@ -1448,9 +1625,32 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
             g_BallPosX += step;
     }
 
-    if (key == GLFW_KEY_C && action == GLFW_PRESS)
+    // Ajuste do ponto final da curva de Bézier com WASD em g_CameraState == CAM_BALL.
+    // Teclas controlam a posição X e Y de P3.
+    // acho que vai ficar muito dificil sem esses limites, testar depois
+    if (g_CameraState == CAM_BALL && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
-        g_BallView = !g_BallView;
+        float step = 0.2f;
+        if (key == GLFW_KEY_W)
+        {
+            g_BezierTargetY += step;
+            if (g_BezierTargetY > 10.0f) g_BezierTargetY = 10.0f; // altura máxima pra nao dar um bagão
+        }
+        if (key == GLFW_KEY_S)
+        {
+            g_BezierTargetY -= step;
+            if (g_BezierTargetY < 0.0f) g_BezierTargetY = 0.0f;  // chão
+        }
+        if (key == GLFW_KEY_A)
+        {
+            g_BezierTargetX -= step;
+            if (g_BezierTargetX < -6.0f) g_BezierTargetX = -6.0f; // maximo da esquerda
+        }
+        if (key == GLFW_KEY_D)
+        {
+            g_BezierTargetX += step;
+            if (g_BezierTargetX >  6.0f) g_BezierTargetX =  6.0f; // maximo da direita
+        }
     }
 
 }
@@ -1760,4 +1960,3 @@ void PrintObjModelInfo(ObjModel* model)
 
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :
-

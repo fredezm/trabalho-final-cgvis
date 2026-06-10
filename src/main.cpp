@@ -217,8 +217,18 @@ float g_BallPosX = 0.0f;
 float g_BallPosY = 3.0f;
 float g_BallPosZ = 0.0f;
 
-// Velocidade vertical da bola
-float g_BallVelY = 0.0f; 
+// FSM da Bola
+enum BallState { BALL_IDLE, BALL_BEZIER, BALL_PHYSICS };
+BallState g_BallState = BALL_IDLE;
+
+// Velocidades da bola nos 3 eixos
+float g_BallVelX = 0.0f;
+float g_BallVelY = 0.0f;
+float g_BallVelZ = 0.0f;
+
+// Variáveis para "congelar" a curva no momento do chute
+float g_KickTime_t = 0.0f;
+glm::vec3 g_P0, g_P1, g_P2, g_P3;
 
 
 // Variáveis que controlam rotação do antebraço
@@ -365,6 +375,33 @@ void InitBezierShaderProgram()
 }
 // -----------------------------------------------------------------------
 
+void ResetGame()
+{
+    // Reseta o estado da bola e física
+    g_BallState = BALL_IDLE;
+    g_BallPosX = 0.0f;
+    g_BallPosY = -0.6f; // Altura inicial
+    g_BallPosZ = 0.0f;
+    g_BallVelX = 0.0f;
+    g_BallVelY = 0.0f;
+    g_BallVelZ = 0.0f;
+
+    // Reseta a curva de Bézier
+    g_KickTime_t = 0.0f;
+    g_BezierArcHeight = 0.0f;
+    g_BezierTargetX = 0.0f;
+    g_BezierTargetY = 0.0f;
+
+    // Reseta a câmera para o padrão livre
+    g_CameraState = CAM_DEFAULT;
+    g_CameraTheta = 0.0f;
+    g_CameraPhi = 0.0f;
+    g_CameraDistance = 3.5f;
+    
+    // Reseta modificadores de corpo (caso use depois)
+    g_AngleX = 0.0f; g_AngleY = 0.0f; g_AngleZ = 0.0f;
+}
+
 //Teste de interseção entre esfera e plano.
 bool TestIntersectionSpherePlane(glm::vec3 sphereCenter, float sphereRadius, float groundY) 
 {
@@ -501,6 +538,9 @@ int main(int argc, char* argv[])
     // Marcamos o tempo do último frame para a simulação física independente de FPS
     float lastTime = (float)glfwGetTime();
 
+    // Garante que o jogo abra com as mesmas configurações de quando é reiniciado
+    ResetGame();
+
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -627,38 +667,75 @@ int main(int argc, char* argv[])
         DrawVirtualObject("the_plane");
         
         // Colisão entre bola e plano do chão, atualizando a posição e velocidade da bola.
-        // Calcula tempo real decorrido entre os frames
+// =================================================================
+        // MÁQUINA DE ESTADOS DA BOLA (Substituindo a física fixa anterior)
+        // =================================================================
+        
+        // 1. Cálculo de tempo (mantenha como está)
         float currentTime = (float)glfwGetTime();
         float deltaTime = currentTime - lastTime;
         lastTime = currentTime;
-
         if (deltaTime > 0.05f) deltaTime = 0.05f;
-        
-        // Atualização de posição e velocidade da bola
-        g_BallVelY += -9.81f * deltaTime;   
-        g_BallPosY += g_BallVelY * deltaTime; 
-        
-        // Parâmetros para o teste de colisão
-        glm::vec3 ballCenter(g_BallPosX, g_BallPosY, g_BallPosZ);
-        float ballRadius = 0.5f;
 
-        // Teste de colisão com o chão
-        float groundHeight = -1.1f;
-        if (TestIntersectionSpherePlane(ballCenter, ballRadius, groundHeight)) 
+        // 2. Comportamento baseado no estado
+        if (g_BallState == BALL_BEZIER)
         {
-            // Empurra a bola para a superfície do chão 
-            g_BallPosY = groundHeight + ballRadius; 
-            
-            // Quique da bola
-            g_BallVelY = -g_BallVelY * 0.7f; 
-            
-            // Se a velocidade for muito baixa, zera para a bola parar de tremer
-            if (g_BallVelY < 0.1f && g_BallVelY > -0.1f) g_BallVelY = 0.0f; 
-            
-            // Atualiza o centro para os próximos testes
-            ballCenter.y = g_BallPosY; 
-        }
+            float kickSpeed = 1.5f; 
+            g_KickTime_t += deltaTime * kickSpeed;
 
+            if (g_KickTime_t >= 1.0f)
+            {
+                g_KickTime_t = 1.0f;
+                g_BallState = BALL_PHYSICS; // Transição para física livre
+
+                // Calcula a velocidade de saída da curva (tangente em t=1)
+                glm::vec3 exitVelocity = 3.0f * (g_P3 - g_P2) * kickSpeed;
+                g_BallVelX = exitVelocity.x;
+                g_BallVelY = exitVelocity.y;
+                g_BallVelZ = exitVelocity.z;
+            }
+            else
+            {
+                float t = g_KickTime_t;
+                float u = 1.0f - t;
+                glm::vec3 pos = u*u*u*g_P0 + 3.0f*u*u*t*g_P1 + 3.0f*u*t*t*g_P2 + t*t*t*g_P3;
+                
+                g_BallPosX = pos.x;
+                g_BallPosY = pos.y;
+                g_BallPosZ = pos.z;
+            }
+        }
+        else if (g_BallState == BALL_PHYSICS)
+        {
+            // Aplica gravidade e movimento
+            g_BallVelY += -9.81f * deltaTime;   
+            g_BallPosX += g_BallVelX * deltaTime;
+            g_BallPosY += g_BallVelY * deltaTime; 
+            g_BallPosZ += g_BallVelZ * deltaTime;
+            
+            // Colisão com o Chão
+            glm::vec3 ballCenter(g_BallPosX, g_BallPosY, g_BallPosZ);
+            float ballRadius = 0.5f;
+            float groundHeight = -1.1f;
+
+            if (TestIntersectionSpherePlane(ballCenter, ballRadius, groundHeight)) 
+            {
+                g_BallPosY = groundHeight + ballRadius; 
+                g_BallVelY = -g_BallVelY * 0.7f; // Quique
+                
+                // Atrito horizontal
+                g_BallVelX *= 0.98f; 
+                g_BallVelZ *= 0.98f;
+
+                if (g_BallVelY < 0.1f && g_BallVelY > -0.1f) g_BallVelY = 0.0f; 
+                
+                // Parada total
+                if (g_BallVelY == 0.0f && std::abs(g_BallVelX) < 0.1f && std::abs(g_BallVelZ) < 0.1f) {
+                    g_BallState = BALL_IDLE;
+                    g_BallVelX = g_BallVelZ = 0.0f;
+                }
+            }
+        }
         // Desenho bola de futebol
         model = Matrix_Translate(g_BallPosX, g_BallPosY, g_BallPosZ)
               * Matrix_Scale(1.0f, 1.0f, 1.0f);
@@ -1541,8 +1618,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_AngleZ += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
     }
 
-    // Se o usuário apertar a tecla espaço, resetamos os ângulos de Euler para zero.
-    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+    // Se o usuário apertar a tecla enter, resetamos os ângulos de Euler para zero.
+    if (key == GLFW_KEY_ENTER && action == GLFW_PRESS)
     {
         g_AngleX = 0.0f;
         g_AngleY = 0.0f;
@@ -1651,6 +1728,31 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
             g_BezierTargetX += step;
             if (g_BezierTargetX >  6.0f) g_BezierTargetX =  6.0f; // maximo da direita
         }
+    }
+
+    // Chuta a bola ao pressionar ESPAÇO
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+    {
+        printf("Espaço pressionado! CameraState: %d, BallState: %d\n", g_CameraState, g_BallState);
+        if (g_CameraState == CAM_BALL && g_BallState == BALL_IDLE)
+            {
+                g_BallState = BALL_BEZIER;
+                g_KickTime_t = 0.0f;
+
+                // Salva os pontos da curva no momento do chute
+                g_P0 = glm::vec3(g_BallPosX, g_BallPosY, g_BallPosZ);
+                g_P3 = glm::vec3(g_BezierTargetX, g_BezierTargetY, -13.0f);
+            
+            glm::vec3 dir = g_P3 - g_P0;
+            g_P1 = g_P0 + dir * 0.25f + glm::vec3(0.0f, g_BezierArcHeight, 0.0f);
+            g_P2 = g_P0 + dir * 0.75f + glm::vec3(0.0f, g_BezierArcHeight * 0.67f, 0.0f);
+        }
+    }   
+
+    // Reinicia o jogo
+    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
+    {
+        ResetGame();
     }
 
 }

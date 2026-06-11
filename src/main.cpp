@@ -412,6 +412,68 @@ bool TestIntersectionSpherePlane(glm::vec3 sphereCenter, float sphereRadius, flo
     return (sphereCenter.y - sphereRadius) <= groundY;
 }
 
+// Teste de intersecção entre uma Esfera e uma Caixa (AABB)
+bool TestIntersectionSphereAABB(glm::vec3 sphereCenter, float sphereRadius, glm::vec3 aabbMin, glm::vec3 aabbMax) 
+{
+    float px = std::max(aabbMin.x, std::min(sphereCenter.x, aabbMax.x));
+    float py = std::max(aabbMin.y, std::min(sphereCenter.y, aabbMax.y));
+    float pz = std::max(aabbMin.z, std::min(sphereCenter.z, aabbMax.z));
+
+    float distanceSquared = (px - sphereCenter.x) * (px - sphereCenter.x) +
+                            (py - sphereCenter.y) * (py - sphereCenter.y) +
+                            (pz - sphereCenter.z) * (pz - sphereCenter.z);
+
+    return distanceSquared <= (sphereRadius * sphereRadius);
+}
+
+GLuint g_DebugVAO = 0;
+GLuint g_DebugVBO = 0;
+
+// Função para desenhar as linhas de uma Bounding Box na tela
+void DrawDebugAABB(glm::vec3 min, glm::vec3 max, glm::mat4 view, glm::mat4 projection)
+{
+    if (g_DebugVAO == 0) {
+        glGenVertexArrays(1, &g_DebugVAO);
+        glGenBuffers(1, &g_DebugVBO);
+    }
+
+    // 8 vértices da caixa
+    glm::vec4 v[8] = {
+        glm::vec4(min.x, min.y, min.z, 1.0f), glm::vec4(max.x, min.y, min.z, 1.0f),
+        glm::vec4(max.x, max.y, min.z, 1.0f), glm::vec4(min.x, max.y, min.z, 1.0f),
+        glm::vec4(min.x, min.y, max.z, 1.0f), glm::vec4(max.x, min.y, max.z, 1.0f),
+        glm::vec4(max.x, max.y, max.z, 1.0f), glm::vec4(min.x, max.y, max.z, 1.0f)
+    };
+
+    // 12 linhas que formam a caixa (2 pontos por linha = 24 vértices)
+    glm::vec4 lines[24] = {
+        v[0], v[1], v[1], v[2], v[2], v[3], v[3], v[0], // Face de trás
+        v[4], v[5], v[5], v[6], v[6], v[7], v[7], v[4], // Face da frente
+        v[0], v[4], v[1], v[5], v[2], v[6], v[3], v[7]  // Conexões (profundidade)
+    };
+
+    glBindVertexArray(g_DebugVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, g_DebugVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lines), lines, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+
+    // Usa o seu shader de linha (o mesmo da curva de bezier)
+    glUseProgram(g_BezierProgramID);
+    glUniformMatrix4fv(glGetUniformLocation(g_BezierProgramID, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(g_BezierProgramID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    // Desenha as linhas sobre os objetos
+    glDisable(GL_DEPTH_TEST); 
+    glLineWidth(2.0f);
+    glDrawArrays(GL_LINES, 0, 24);
+    glLineWidth(1.0f);
+    glEnable(GL_DEPTH_TEST);
+
+    glBindVertexArray(0);
+    glUseProgram(g_GpuProgramID); // Restaura o shader normal
+}
+
 int main(int argc, char* argv[])
 {
     // Inicializamos a biblioteca GLFW, utilizada para criar uma janela do
@@ -671,17 +733,14 @@ int main(int argc, char* argv[])
         DrawVirtualObject("the_plane");
         
         // Colisão entre bola e plano do chão, atualizando a posição e velocidade da bola.
-// =================================================================
-        // MÁQUINA DE ESTADOS DA BOLA (Substituindo a física fixa anterior)
-        // =================================================================
-        
-        // 1. Cálculo de tempo (mantenha como está)
+        // FSM da bola
+        // Cálculo de tempo
         float currentTime = (float)glfwGetTime();
         float deltaTime = currentTime - lastTime;
         lastTime = currentTime;
         if (deltaTime > 0.05f) deltaTime = 0.05f;
 
-        // 2. Comportamento baseado no estado
+        // Comportamento baseado no estado
         if (g_BallState == BALL_BEZIER)
         {
             float kickSpeed = 1.5f; 
@@ -690,7 +749,7 @@ int main(int argc, char* argv[])
             if (g_KickTime_t >= 1.0f)
             {
                 g_KickTime_t = 1.0f;
-                g_BallState = BALL_PHYSICS; // Transição para física livre
+                g_BallState = BALL_PHYSICS;
 
                 // Calcula a velocidade de saída da curva (tangente em t=1)
                 glm::vec3 exitVelocity = 3.0f * (g_P3 - g_P2) * kickSpeed;
@@ -725,7 +784,7 @@ int main(int argc, char* argv[])
             if (TestIntersectionSpherePlane(ballCenter, ballRadius, groundHeight)) 
             {
                 g_BallPosY = groundHeight + ballRadius; 
-                g_BallVelY = -g_BallVelY * 0.7f; // Quique
+                g_BallVelY = -g_BallVelY * 0.7f; // Quique da bola
                 
                 // Atrito horizontal
                 g_BallVelX *= 0.98f; 
@@ -737,6 +796,77 @@ int main(int argc, char* argv[])
                 if (g_BallVelY == 0.0f && std::abs(g_BallVelX) < 0.1f && std::abs(g_BallVelZ) < 0.1f) {
                     g_BallState = BALL_IDLE;
                     g_BallVelX = g_BallVelZ = 0.0f;
+                }
+            }
+
+            // Colisão com traves e travessão (Hitboxes Manuais)
+            float goalZ = -13.0f;        // Posição Z exata do gol
+            float postX = 4.0f;          // Distância do centro até as traves (ajuste para alinhar com o visual)
+            float postThickness = 0.2f;  // Espessura da trave
+            float crossbarHeight = 1.8f; // Altura do travessão (ajuste se bater no ar)
+
+            glm::vec3 leftPostMin(-postX - postThickness, -1.1f, goalZ - postThickness);
+            glm::vec3 leftPostMax(-postX + postThickness, crossbarHeight, goalZ + postThickness);
+
+            glm::vec3 rightPostMin(postX - postThickness, -1.1f, goalZ - postThickness);
+            glm::vec3 rightPostMax(postX + postThickness, crossbarHeight, goalZ + postThickness);
+
+            glm::vec3 crossbarMin(-postX, crossbarHeight - postThickness, goalZ - postThickness);
+            glm::vec3 crossbarMax(postX, crossbarHeight + postThickness, goalZ + postThickness);
+
+            glm::vec3 hitboxesMin[] = {leftPostMin, rightPostMin, crossbarMin};
+            glm::vec3 hitboxesMax[] = {leftPostMax, rightPostMax, crossbarMax};
+
+            // Testa colisões individualmente
+            for (int i = 0; i < 3; i++)
+            {
+                glm::vec3 aabbMin = hitboxesMin[i];
+                glm::vec3 aabbMax = hitboxesMax[i];
+
+                if (TestIntersectionSphereAABB(ballCenter, ballRadius, aabbMin, aabbMax)) 
+                {
+                    // Encontra o ponto da superfície da trave que está mais próximo da bola
+                    float px = std::max(aabbMin.x, std::min(ballCenter.x, aabbMax.x));
+                    float py = std::max(aabbMin.y, std::min(ballCenter.y, aabbMax.y));
+                    float pz = std::max(aabbMin.z, std::min(ballCenter.z, aabbMax.z));
+                    
+                    glm::vec3 closestPoint(px, py, pz);
+                    glm::vec3 distVec = ballCenter - closestPoint;
+                    float dist = glm::length(distVec);
+                    
+                    glm::vec3 normal(0.0f, 1.0f, 0.0f);
+                    
+                    // Empurra a bola fisicamente para fora até que a borda (raio) cole na trave, e calcula a normal real da colisão
+                    if (dist > 0.001f) {
+                        normal = distVec / dist;
+                        float penetration = ballRadius - dist; 
+                        
+                        g_BallPosX += normal.x * penetration;
+                        g_BallPosY += normal.y * penetration;
+                        g_BallPosZ += normal.z * penetration;
+                    }
+                    // Caso extremo de alta velocidade onde a bola penetra completamente a trave, aproximamos a normal pela direção oposta da velocidade
+                    else 
+                    {
+                        glm::vec3 velDir = glm::normalize(glm::vec3(g_BallVelX, 0.0f, g_BallVelZ));
+                        g_BallPosX -= velDir.x * ballRadius;
+                        g_BallPosZ -= velDir.z * ballRadius;
+                        normal = -velDir;
+                    }
+
+                    // Reflexão espelhada
+                    glm::vec3 currentVel(g_BallVelX, g_BallVelY, g_BallVelZ);
+                    
+                    // Calcula o rebatimento baseado no ângulo exato da batida
+                    glm::vec3 reflectedVel = glm::reflect(currentVel, normal);
+                    
+                    float restitution = 0.6f; // Perde 40% da energia ao bater na trave
+                    
+                    g_BallVelX = reflectedVel.x * restitution;
+                    g_BallVelY = reflectedVel.y * restitution;
+                    g_BallVelZ = reflectedVel.z * restitution;
+
+                    break;
                 }
             }
         }
@@ -764,6 +894,26 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, GOAL_NET);
         DrawVirtualObject("Net.001_Plane.003_Net");
         glDisable(GL_BLEND);
+
+        // Renderiza hitboxes para debug (copiar e colar valores para ajustar)
+        float dbg_goalZ = -13.0f;        
+        float dbg_postX = 4.0f;          
+        float dbg_postThickness = 0.2f;  
+        float dbg_crossbarHeight = 1.8f; 
+
+        glm::vec3 dbg_leftMin(-dbg_postX - dbg_postThickness, -1.1f, dbg_goalZ - dbg_postThickness);
+        glm::vec3 dbg_leftMax(-dbg_postX + dbg_postThickness, dbg_crossbarHeight, dbg_goalZ + dbg_postThickness);
+
+        glm::vec3 dbg_rightMin(dbg_postX - dbg_postThickness, -1.1f, dbg_goalZ - dbg_postThickness);
+        glm::vec3 dbg_rightMax(dbg_postX + dbg_postThickness, dbg_crossbarHeight, dbg_goalZ + dbg_postThickness);
+
+        glm::vec3 dbg_crossbarMin(-dbg_postX, dbg_crossbarHeight - dbg_postThickness, dbg_goalZ - dbg_postThickness);
+        glm::vec3 dbg_crossbarMax(dbg_postX, dbg_crossbarHeight + dbg_postThickness, dbg_goalZ + dbg_postThickness);
+
+        // Renderiza as caixas
+        DrawDebugAABB(dbg_leftMin, dbg_leftMax, view, projection);
+        DrawDebugAABB(dbg_rightMin, dbg_rightMax, view, projection);
+        DrawDebugAABB(dbg_crossbarMin, dbg_crossbarMax, view, projection);
 
         // ---------------------------------------------------------------
         // Renderiza a linha de trajetória de Bézier cúbica (apenas em

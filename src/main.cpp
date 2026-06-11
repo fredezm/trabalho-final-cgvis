@@ -221,6 +221,9 @@ float g_BallPosZ = 0.0f;
 enum BallState { BALL_IDLE, BALL_BEZIER, BALL_PHYSICS };
 BallState g_BallState = BALL_IDLE;
 
+// Flag para garantir que só ocorra um chute por rodada
+bool g_HasKicked = false;
+
 // Velocidades da bola nos 3 eixos
 float g_BallVelX = 0.0f;
 float g_BallVelY = 0.0f;
@@ -379,6 +382,7 @@ void ResetGame()
 {
     // Reseta o estado da bola e física
     g_BallState = BALL_IDLE;
+    g_HasKicked = false;
     g_BallPosX = 0.0f;
     g_BallPosY = -0.6f; // Altura inicial
     g_BallPosZ = 0.0f;
@@ -765,7 +769,7 @@ int main(int argc, char* argv[])
         // Renderiza a linha de trajetória de Bézier cúbica (apenas em
         // g_CameraState == CAM_BALL), mostrando o arco previsto para o chute da bola.
         // ---------------------------------------------------------------
-        if (g_CameraState == CAM_BALL)
+        if (g_CameraState == CAM_BALL && !g_HasKicked)
         {
             // Atualiza (ou cria) o VAO/VBO com os pontos da curva
             UpdateBezierTrajectory();
@@ -1730,24 +1734,24 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         }
     }
 
-    // Chuta a bola ao pressionar ESPAÇO
+// Chutar a bola ao pressionar ESPAÇO
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
     {
-        printf("Espaço pressionado! CameraState: %d, BallState: %d\n", g_CameraState, g_BallState);
-        if (g_CameraState == CAM_BALL && g_BallState == BALL_IDLE)
-            {
-                g_BallState = BALL_BEZIER;
-                g_KickTime_t = 0.0f;
+        if (g_CameraState == CAM_BALL && g_BallState == BALL_IDLE && !g_HasKicked)
+        {
+            g_HasKicked = true; // Ativa a trava para os próximos frames
+            g_BallState = BALL_BEZIER;
+            g_KickTime_t = 0.0f;
 
-                // Salva os pontos da curva no momento do chute
-                g_P0 = glm::vec3(g_BallPosX, g_BallPosY, g_BallPosZ);
-                g_P3 = glm::vec3(g_BezierTargetX, g_BezierTargetY, -13.0f);
+            // Salva os pontos da curva no momento do chute
+            g_P0 = glm::vec3(g_BallPosX, g_BallPosY, g_BallPosZ);
+            g_P3 = glm::vec3(g_BezierTargetX, g_BezierTargetY, -13.0f);
             
             glm::vec3 dir = g_P3 - g_P0;
             g_P1 = g_P0 + dir * 0.25f + glm::vec3(0.0f, g_BezierArcHeight, 0.0f);
             g_P2 = g_P0 + dir * 0.75f + glm::vec3(0.0f, g_BezierArcHeight * 0.67f, 0.0f);
         }
-    }   
+    }
 
     // Reinicia o jogo
     if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)

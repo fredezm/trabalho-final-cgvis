@@ -27,6 +27,7 @@ uniform mat4 projection;
 #define GOAL_POLE_IRON 4
 #define GOAL_NET       5
 #define GOAL_POLE      6
+#define GOALKEEPER     7
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -42,6 +43,8 @@ uniform sampler2D TextureImage3;
 uniform sampler2D TextureImage4;
 uniform sampler2D TextureImage5;
 uniform sampler2D TextureImage6;
+uniform sampler2D TextureImage7;  // goalkeeper — corpo/uniforme (diffuse)
+uniform sampler2D TextureImage8;  // goalkeeper — detalhes (base color)
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -186,6 +189,18 @@ void main()
         U = texcoords.x;
         V = texcoords.y;
         Kd0 = texture(TextureImage4, vec2(U, V)).rgb;
+    }
+    else if ( object_id == GOALKEEPER )
+    {
+        // Usa coordenadas UV do arquivo OBJ.
+        // TextureImage7 = diffuse (corpo/uniforme), TextureImage8 = base color (detalhes).
+        U = texcoords.x;
+        V = texcoords.y;
+        vec3 diffuse = texture(TextureImage7, vec2(U, V)).rgb;
+        vec3 detail  = texture(TextureImage8, vec2(U, V)).rgb;
+        // Combina as duas texturas: difusa com leve overlay de detalhe
+        Kd0 = mix(diffuse, detail, 0.3);
+        Ks  = vec3(0.2); // pouco brilho especular
     }
 
     // Equação de iluminação (Phong por fragmento)

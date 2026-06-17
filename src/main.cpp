@@ -204,14 +204,49 @@ float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.5f; // Distância da câmera para a origem
 
 // Máquina de estados da câmera.
-// F cicla: CAM_DEFAULT → CAM_AERIAL → CAM_BALL → (por enquanto CAM_DEFAULT)
-enum CameraState { CAM_DEFAULT, CAM_AERIAL, CAM_BALL };
+// F cicla: CAM_DEFAULT → CAM_AERIAL → CAM_WALL → CAM_BALL → (por enquanto CAM_DEFAULT)
+enum CameraState { CAM_DEFAULT, CAM_AERIAL, CAM_WALL, CAM_BALL };
 CameraState g_CameraState = CAM_DEFAULT;
 
 
 float g_PrevCameraTheta = 0.0f;
 float g_PrevCameraPhi = 0.0f;
 float g_PrevCameraDistance = 3.5f;
+
+// Variaveis da barreira
+float g_WallOffsetX = 0.0f;
+// Variáveis globais para persistir a posição final da barreira
+glm::vec3 g_WallCenter   = glm::vec3(0.0f);
+glm::vec3 g_WallRightDir = glm::vec3(0.0f);
+float     g_WallAngle    = 0.0f;
+
+static const float WALL_DIST_FROM_BALL = 6.0f; // distância da barreira para a posição da bola
+static const float WALL_PLAYER_SEP = 1.6f; // distância entre os jogadores da barreira
+static const float WALL_SCALE = 1.5f; // escala dos defensores da barreira
+
+// Raio da cápsula de colisão de cada defensor (metade da largura escalada)
+static const float WALL_CAPSULE_RADIUS = 0.57f;   // 0.571 * WALL_SCALE / 2 ≈ 0.43; usamos 0.57 para folga
+static const float WALL_CAPSULE_HEIGHT = 2.6f;     // 1.74 * WALL_SCALE
+// Testa colisão de esfera contra um segmento vertical (cápsula infinita em Y).
+// Retorna true se a esfera (center, radius) penetra a cápsula do defensor em (cx, cz).
+bool TestSphereWallCapsule(glm::vec3 sphereCenter, float sphereRadius,
+                           float cx, float cz,
+                           float capsuleRadius, float capsuleYMin, float capsuleYMax)
+{
+    // Teste no plano XZ
+    float dx = sphereCenter.x - cx;
+    float dz = sphereCenter.z - cz;
+    float dist2D = sqrtf(dx*dx + dz*dz);
+    if (dist2D > sphereRadius + capsuleRadius) return false;
+    // Teste em Y (esfera deve sobrepor a faixa vertical da cápsula)
+    float sphereYMin = sphereCenter.y - sphereRadius;
+    float sphereYMax = sphereCenter.y + sphereRadius;
+    if (sphereYMax < capsuleYMin || sphereYMin > capsuleYMax) return false;
+    return true;
+}
+
+
+
 // Posição da bola no plano do chão (X,Z). 
 float g_BallPosX = 0.0f;
 float g_BallPosY = 3.0f;
@@ -571,14 +606,22 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/Net.001_color.png");   // TextureImage5
     LoadTextureImage("../../data/Net.001_alpha.png");   // TextureImage6
 
+    LoadTextureImage("../../data/RGB_f80cd3e98591498ebe42f2fd55080acf_short01_diffuse.png"); // TextureImage7 — corpo/uniforme defesa
+    LoadTextureImage("../../data/RGB_45e5fd0197b54093b86252868acf5166_1001_Base_Color.png"); // TextureImage8 — detalhes defesa
+
     // Construímos a representação de objetos geométricos através de malhas de triângulos
 
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
+
     ObjModel footballmodel("../../data/FootBall.obj");
     ComputeNormals(&footballmodel);
     BuildTrianglesAndAddToVirtualScene(&footballmodel);
+
+    ObjModel goalkeepermodel("../../data/goalkeeper.obj");
+    ComputeNormals(&goalkeepermodel);
+    BuildTrianglesAndAddToVirtualScene(&goalkeepermodel);
 
     ObjModel goalmodel("../../data/Soccergoal.obj");
     ComputeNormals(&goalmodel);
@@ -644,7 +687,7 @@ int main(int argc, char* argv[])
         glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
         glm::vec4 camera_up_vector;
 
-        if (g_CameraState == CAM_BALL)
+          if (g_CameraState == CAM_BALL)
         {
             glm::vec3 ballPosition(g_BallPosX, g_BallPosY, g_BallPosZ);
             glm::vec3 goalPosition(0.0f, 0.0f, -13.0f);
@@ -668,6 +711,17 @@ int main(int argc, char* argv[])
             camera_view_vector = camera_lookat_l - camera_position_c;
             camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
         }
+        else if (g_CameraState == CAM_WALL)
+        {
+            //Posição da câmera no centro do gol (posição do goleiro). Pode ser melhorado
+            camera_position_c  = glm::vec4(0.0f, 1.5f, -12.5f, 1.0f); 
+            
+            glm::vec4 target_ball_pos = glm::vec4(g_BallPosX, g_BallPosY, g_BallPosZ, 1.0f);
+            
+            camera_view_vector = target_ball_pos - camera_position_c;
+            
+            camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+        }
         else
         {
         if (g_CameraState == CAM_AERIAL)
@@ -676,6 +730,7 @@ int main(int argc, char* argv[])
             camera_up_vector = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" padrão apontando para o "céu" (eixo Y global)
         }
 
+        
         // Computamos a matriz "View" utilizando os parâmetros da câmera para
         // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
         glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
@@ -718,12 +773,12 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(g_projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
 
 
-        #define PLANE  2
-        #define FOOTBALL 3
+        #define PLANE           2        
+        #define FOOTBALL        3
         #define GOAL_POLE_IRON  4
         #define GOAL_NET        5
         #define GOAL_POLE       6
-
+        #define GOALKEEPER      7
 
         // Desenhamos o plano do chão
         model = Matrix_Translate(0.0f,-1.1f,0.0f)
@@ -739,6 +794,31 @@ int main(int argc, char* argv[])
         float deltaTime = currentTime - lastTime;
         lastTime = currentTime;
         if (deltaTime > 0.05f) deltaTime = 0.05f;
+        
+        // =================================================================
+        // LÓGICA DA BARREIRA (Posição e Orientação)
+        // Dentro do loop principal (antes da física e da renderização):
+        if (!g_HasKicked)
+        {
+            glm::vec3 goalPos(0.0f, 0.0f, -13.0f);
+            glm::vec3 ballPosPlane(g_BallPosX, 0.0f, g_BallPosZ);
+            
+            // Direção da bola para o gol
+            glm::vec3 dirToGoalWall = glm::normalize(goalPos - ballPosPlane);
+            
+            // Vetor perpendicular para o deslocamento lateral
+            g_WallRightDir = glm::vec3(-dirToGoalWall.z, 0.0f, dirToGoalWall.x);
+
+            float wallDistance = 4.0f; // Distância fixa da barreira até a bola
+            
+            // Calcula e armazena a posição centralizada da barreira com o offset do jogador
+            g_WallCenter = ballPosPlane + (dirToGoalWall * wallDistance) + (g_WallRightDir * g_WallOffsetX);
+            g_WallCenter.y = -1.1f; // Alinhado ao chão
+
+            // Ângulo de rotação para os defensores encararem a bola
+            g_WallAngle = atan2(dirToGoalWall.x, dirToGoalWall.z);
+        }
+        // =================================================================
 
         // Comportamento baseado no estado
         if (g_BallState == BALL_BEZIER)
@@ -817,6 +897,7 @@ int main(int argc, char* argv[])
             glm::vec3 hitboxesMin[] = {leftPostMin, rightPostMin, crossbarMin};
             glm::vec3 hitboxesMax[] = {leftPostMax, rightPostMax, crossbarMax};
 
+
             // Testa colisões individualmente
             for (int i = 0; i < 3; i++)
             {
@@ -868,7 +949,7 @@ int main(int argc, char* argv[])
 
                     break;
                 }
-            }
+            }      
         }
         // Desenho bola de futebol
         model = Matrix_Translate(g_BallPosX, g_BallPosY, g_BallPosZ)
@@ -895,6 +976,31 @@ int main(int argc, char* argv[])
         DrawVirtualObject("Net.001_Plane.003_Net");
         glDisable(GL_BLEND);
 
+        // =================================================================
+        // DESENHAR BARREIRA na camera do goleiro ou da bola
+        // =================================================================
+        if (g_CameraState == CAM_WALL || g_CameraState == CAM_BALL)
+        {
+            float distEntreDefensores = 0.6f; // Distância do centro para cada boneco
+
+            // Defensor 1 (Esquerda)
+            glm::vec3 def1Pos = g_WallCenter - (g_WallRightDir * distEntreDefensores);
+            model = Matrix_Translate(def1Pos.x, def1Pos.y, def1Pos.z)
+                * Matrix_Rotate_Y(g_WallAngle)
+                * Matrix_Scale(1.0f, 1.0f, 1.0f); 
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, GOALKEEPER);
+            DrawVirtualObject("object_0");
+
+            // Defensor 2 (Direita)
+            glm::vec3 def2Pos = g_WallCenter + (g_WallRightDir * distEntreDefensores);
+            model = Matrix_Translate(def2Pos.x, def2Pos.y, def2Pos.z)
+                * Matrix_Rotate_Y(g_WallAngle)
+                * Matrix_Scale(1.0f, 1.0f, 1.0f);
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, GOALKEEPER);
+            DrawVirtualObject("object_0");
+        }
         // Renderiza hitboxes para debug (copiar e colar valores para ajustar)
         float dbg_goalZ = -13.0f;        
         float dbg_postX = 4.0f;          
@@ -1829,6 +1935,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 
         case CAM_AERIAL:
             // Mantém os parâmetros esféricos do aéreo e entra em visão da bola
+            g_CameraState = CAM_WALL;
+            break;
+        
+        case CAM_WALL:
             g_CameraState = CAM_BALL;
             break;
 
@@ -1900,6 +2010,22 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
             glm::vec3 dir = g_P3 - g_P0;
             g_P1 = g_P0 + dir * 0.25f + glm::vec3(0.0f, g_BezierArcHeight, 0.0f);
             g_P2 = g_P0 + dir * 0.75f + glm::vec3(0.0f, g_BezierArcHeight * 0.67f, 0.0f);
+        }
+    }
+
+
+    if (g_CameraState == CAM_WALL && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    {
+        float step = 0.2f;
+        if (key == GLFW_KEY_D)
+        {
+            g_WallOffsetX -= step;
+            if (g_WallOffsetX < -6.0f) g_WallOffsetX = -6.0f; // maximo da esquerda
+        }
+        if (key == GLFW_KEY_A)
+        {
+            g_WallOffsetX += step;
+            if (g_WallOffsetX >  6.0f) g_WallOffsetX =  6.0f; // maximo da direita
         }
     }
 

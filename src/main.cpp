@@ -309,6 +309,9 @@ float g_BezierArcHeight = 0.0f;
 float g_BezierTargetY   = 0.0f;    
 float g_BezierTargetX   = 0.0f;    
 
+// Controla se a linha é desenhada por completo (true) ou pela metade (false)
+bool g_ShowFullBezier = false;
+
 // Shaders inline para a linha — sem iluminação, sem textura, apenas posição → cor
 static const GLchar* const bezier_vertex_src =
     "#version 330 core\n"
@@ -1044,7 +1047,8 @@ int main(int argc, char* argv[])
 
             glLineWidth(6.0f);
             glBindVertexArray(g_BezierVAO);
-            glDrawArrays(GL_LINE_STRIP, 0, BEZIER_SEGMENTS + 1);
+            int pointsToDraw = g_ShowFullBezier ? (BEZIER_SEGMENTS + 1) : (BEZIER_SEGMENTS / 2 + 1);
+            glDrawArrays(GL_LINE_STRIP, 0, pointsToDraw);
             glBindVertexArray(0);
 
             glEnable(GL_DEPTH_TEST);
@@ -1914,6 +1918,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         LoadShadersFromFiles();
         fprintf(stdout,"Shaders recarregados!\n");
         fflush(stdout);
+    }
+
+    // Se o usuário apertar a tecla T, alterna entre a mira cheia e a mira pela metade
+    if (key == GLFW_KEY_T && action == GLFW_PRESS)
+    {
+        g_ShowFullBezier = !g_ShowFullBezier;
     }
 
     // Tecla F cicla entre os estados da câmera:

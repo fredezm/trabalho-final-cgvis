@@ -259,6 +259,9 @@ BallState g_BallState = BALL_IDLE;
 // Flag para garantir que só ocorra um chute por rodada
 bool g_HasKicked = false;
 
+// Flag para indicar que um gol foi marcado
+bool g_GoalScored = false;
+
 // Velocidades da bola nos 3 eixos
 float g_BallVelX = 0.0f;
 float g_BallVelY = 0.0f;
@@ -322,8 +325,9 @@ static const GLchar* const bezier_vertex_src =
 
 static const GLchar* const bezier_fragment_src =
     "#version 330 core\n"
+    "uniform vec4 lineColor;\n"
     "out vec4 color;\n"
-    "void main() { color = vec4(1.0, 0.85, 0.0, 1.0); }\n"; // amarelo dourado
+    "void main() { color = lineColor; }\n"; // cor da linha
 
 // Cria (na primeira chamada) ou atualiza o VAO/VBO com os pontos da curva.
 // P0 = posição atual da bola, P3 = ponto final (interativo),
@@ -421,6 +425,7 @@ void ResetGame()
     // Reseta o estado da bola e física
     g_BallState = BALL_IDLE;
     g_HasKicked = false;
+    g_GoalScored = false;
     g_BallPosX = 0.0f;
     g_BallPosY = -0.6f; // Altura inicial
     g_BallPosZ = 0.0f;
@@ -468,7 +473,7 @@ GLuint g_DebugVAO = 0;
 GLuint g_DebugVBO = 0;
 
 // Função para desenhar as linhas de uma Bounding Box na tela
-void DrawDebugAABB(glm::vec3 min, glm::vec3 max, glm::mat4 view, glm::mat4 projection)
+void DrawDebugAABB(glm::vec3 min, glm::vec3 max, glm::vec4 color, glm::mat4 view, glm::mat4 projection)
 {
     if (g_DebugVAO == 0) {
         glGenVertexArrays(1, &g_DebugVAO);
@@ -496,8 +501,8 @@ void DrawDebugAABB(glm::vec3 min, glm::vec3 max, glm::mat4 view, glm::mat4 proje
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
 
-    // Usa o seu shader de linha (o mesmo da curva de bezier)
     glUseProgram(g_BezierProgramID);
+    glUniform4f(glGetUniformLocation(g_BezierProgramID, "lineColor"), color.r, color.g, color.b, color.a);
     glUniformMatrix4fv(glGetUniformLocation(g_BezierProgramID, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(g_BezierProgramID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
@@ -944,7 +949,7 @@ int main(int argc, char* argv[])
                     // Calcula o rebatimento baseado no ângulo exato da batida
                     glm::vec3 reflectedVel = glm::reflect(currentVel, normal);
                     
-                    float restitution = 0.6f; // Perde 40% da energia ao bater na trave
+                    float restitution = 0.75f; // Perde 25% da energia ao bater na trave
                     
                     g_BallVelX = reflectedVel.x * restitution;
                     g_BallVelY = reflectedVel.y * restitution;
@@ -952,7 +957,96 @@ int main(int argc, char* argv[])
 
                     break;
                 }
-            }      
+            } 
+            glm::vec3 scoreMin(-3.7f, -1.0f, -14.3f); // Limite inferior (dentro do gol)
+            glm::vec3 scoreMax( 3.7f,  1.6f, -13.6f); // Limite superior (dentro do gol)
+
+            // Testamos se a bola está cruzando a caixa de gol E se ainda não marcou
+            if (!g_GoalScored && TestIntersectionSphereAABB(ballCenter, ballRadius, scoreMin, scoreMax)) 
+            {
+                printf("          GOL!          \n");
+                g_GoalScored = true;
+            }
+
+            // Colisão com rede
+            float netDepth = 1.4f; 
+            float netFrontZ = goalZ - postThickness;
+            float netBackZ = goalZ - netDepth; 
+            float netThickness = 0.1f; 
+
+            // 1. Rede Esquerda
+            glm::vec3 netLeftMin(-postX - postThickness - netThickness, -1.1f, netBackZ);
+            glm::vec3 netLeftMax(-postX - postThickness, crossbarHeight, netFrontZ);
+
+            // 2. Rede Direita
+            glm::vec3 netRightMin(postX + postThickness, -1.1f, netBackZ);
+            glm::vec3 netRightMax(postX + postThickness + netThickness, crossbarHeight, netFrontZ);
+
+            // 3. Rede Superior (Teto)
+            glm::vec3 netTopMin(-postX - postThickness, crossbarHeight, netBackZ);
+            glm::vec3 netTopMax(postX + postThickness, crossbarHeight + netThickness, netFrontZ);
+
+            // 4. Rede Fundo (Traseira)
+            glm::vec3 netBackMin(-postX - postThickness, -1.1f, netBackZ - netThickness);
+            glm::vec3 netBackMax(postX + postThickness, crossbarHeight, netBackZ);
+
+            glm::vec3 netHitboxesMin[] = {netLeftMin, netRightMin, netTopMin, netBackMin};
+            glm::vec3 netHitboxesMax[] = {netLeftMax, netRightMax, netTopMax, netBackMax};
+
+            // Testa as colisões com a rede
+            for (int i = 0; i < 4; i++)
+            {
+                glm::vec3 aabbMin = netHitboxesMin[i];
+                glm::vec3 aabbMax = netHitboxesMax[i];
+
+                if (TestIntersectionSphereAABB(ballCenter, ballRadius, aabbMin, aabbMax)) 
+                {
+                    
+                    float px = std::max(aabbMin.x, std::min(ballCenter.x, aabbMax.x));
+                    float py = std::max(aabbMin.y, std::min(ballCenter.y, aabbMax.y));
+                    float pz = std::max(aabbMin.z, std::min(ballCenter.z, aabbMax.z));
+                    
+                    glm::vec3 closestPoint(px, py, pz);
+                    glm::vec3 distVec = ballCenter - closestPoint;
+                    float dist = glm::length(distVec);
+                    
+                    glm::vec3 normal(0.0f, 1.0f, 0.0f);
+                    
+                    if (dist > 0.001f) {
+                        normal = distVec / dist;
+                        float penetration = ballRadius - dist; 
+                        g_BallPosX += normal.x * penetration;
+                        g_BallPosY += normal.y * penetration;
+                        g_BallPosZ += normal.z * penetration;
+                    } else {
+                        glm::vec3 velDir = glm::normalize(glm::vec3(g_BallVelX, g_BallVelY, g_BallVelZ));
+                        g_BallPosX -= velDir.x * ballRadius;
+                        g_BallPosY -= velDir.y * ballRadius;
+                        g_BallPosZ -= velDir.z * ballRadius;
+                        normal = -velDir;
+                    }
+
+                    // Amortecimento da rede
+                    glm::vec3 currentVel(g_BallVelX, g_BallVelY, g_BallVelZ);
+                    glm::vec3 reflectedVel = glm::reflect(currentVel, normal);
+
+                    // Verifica se o centro da bola está fora do volume interno do gol
+                    bool isOutside = (ballCenter.x < -postX || 
+                                      ballCenter.x > postX || 
+                                      ballCenter.y > crossbarHeight || 
+                                      ballCenter.z < netBackZ);
+                    
+                    // Se bateu por fora, rebate.
+                    // Se bateu por dentro, amortece.
+                    float netRestitution = isOutside ? 0.6f : 0.15f;
+                    
+                    g_BallVelX = reflectedVel.x * netRestitution;
+                    g_BallVelY = reflectedVel.y * netRestitution;
+                    g_BallVelZ = reflectedVel.z * netRestitution;
+
+                    break; // Sai do loop após colidir com uma das placas da rede
+                }
+            }    
         }
         // Desenho bola de futebol
         model = Matrix_Translate(g_BallPosX, g_BallPosY, g_BallPosZ)
@@ -1004,7 +1098,7 @@ int main(int argc, char* argv[])
             glUniform1i(g_object_id_uniform, GOALKEEPER);
             DrawVirtualObject("object_0");
         }
-        // Renderiza hitboxes para debug (copiar e colar valores para ajustar)
+        // Renderiza hitboxes das traves e travessao para debug (copiar e colar valores para ajustar)
         float dbg_goalZ = -13.0f;        
         float dbg_postX = 4.0f;          
         float dbg_postThickness = 0.2f;  
@@ -1019,10 +1113,44 @@ int main(int argc, char* argv[])
         glm::vec3 dbg_crossbarMin(-dbg_postX, dbg_crossbarHeight - dbg_postThickness, dbg_goalZ - dbg_postThickness);
         glm::vec3 dbg_crossbarMax(dbg_postX, dbg_crossbarHeight + dbg_postThickness, dbg_goalZ + dbg_postThickness);
 
-        // Renderiza as caixas
-        DrawDebugAABB(dbg_leftMin, dbg_leftMax, view, projection);
-        DrawDebugAABB(dbg_rightMin, dbg_rightMax, view, projection);
-        DrawDebugAABB(dbg_crossbarMin, dbg_crossbarMax, view, projection);
+        // Renderiza as caixas amarelas de colisão
+        DrawDebugAABB(dbg_leftMin, dbg_leftMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+        DrawDebugAABB(dbg_rightMin, dbg_rightMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+        DrawDebugAABB(dbg_crossbarMin, dbg_crossbarMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+
+        // Renderiza hitboxes das redes para debug (copiar e colar valores para ajustar)
+        // Variáveis para você ajustar o tamanho e posição da rede
+        float dbg_netDepth = 1.4f; // O quão profunda a rede vai para trás
+        float dbg_netFrontZ = dbg_goalZ - dbg_postThickness; // Define que a rede começa exatamente atrás da trave
+        float dbg_netBackZ = dbg_goalZ - dbg_netDepth; // Calcula o Z final da rede
+        float dbg_netThickness = 0.1f; // Placa fininha para a rede
+
+        // 1. Rede Esquerda (Placa lateral)
+        glm::vec3 dbg_netLeftMin(-dbg_postX - dbg_postThickness - dbg_netThickness, -1.1f, dbg_netBackZ);
+        glm::vec3 dbg_netLeftMax(-dbg_postX - dbg_postThickness, dbg_crossbarHeight, dbg_netFrontZ);
+
+        // 2. Rede Direita (Placa lateral)
+        glm::vec3 dbg_netRightMin(dbg_postX + dbg_postThickness, -1.1f, dbg_netBackZ);
+        glm::vec3 dbg_netRightMax(dbg_postX + dbg_postThickness + dbg_netThickness, dbg_crossbarHeight, dbg_netFrontZ);
+
+        // 3. Rede Superior (Teto)
+        glm::vec3 dbg_netTopMin(-dbg_postX - dbg_postThickness, dbg_crossbarHeight, dbg_netBackZ);
+        glm::vec3 dbg_netTopMax(dbg_postX + dbg_postThickness, dbg_crossbarHeight + dbg_netThickness, dbg_netFrontZ);
+
+        // 4. Rede Fundo (Traseira)
+        glm::vec3 dbg_netBackMin(-dbg_postX - dbg_postThickness, -1.1f, dbg_netBackZ - dbg_netThickness);
+        glm::vec3 dbg_netBackMax(dbg_postX + dbg_postThickness, dbg_crossbarHeight, dbg_netBackZ);
+
+        // Desenha as caixas da rede
+        DrawDebugAABB(dbg_netLeftMin, dbg_netLeftMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+        DrawDebugAABB(dbg_netRightMin, dbg_netRightMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+        DrawDebugAABB(dbg_netTopMin, dbg_netTopMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+        DrawDebugAABB(dbg_netBackMin, dbg_netBackMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+
+        // Renderiza a caixa verde do gatilho de Gol
+        glm::vec3 dbg_scoreMin(-3.7f, -1.0f, -14.3f); 
+        glm::vec3 dbg_scoreMax( 3.7f,  1.6f, -13.6f); 
+        DrawDebugAABB(dbg_scoreMin, dbg_scoreMax, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), view, projection);
 
         // ---------------------------------------------------------------
         // Renderiza a linha de trajetória de Bézier cúbica (apenas em
@@ -1046,6 +1174,7 @@ int main(int argc, char* argv[])
             glDisable(GL_DEPTH_TEST);
 
             glLineWidth(6.0f);
+            glUniform4f(glGetUniformLocation(g_BezierProgramID, "lineColor"), 1.0f, 0.85f, 0.0f, 1.0f);
             glBindVertexArray(g_BezierVAO);
             int pointsToDraw = g_ShowFullBezier ? (BEZIER_SEGMENTS + 1) : (BEZIER_SEGMENTS / 2 + 1);
             glDrawArrays(GL_LINE_STRIP, 0, pointsToDraw);

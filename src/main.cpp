@@ -253,7 +253,7 @@ float g_BallPosY = 3.0f;
 float g_BallPosZ = 0.0f;
 
 // FSM da Bola
-enum BallState { BALL_IDLE, BALL_BEZIER, BALL_PHYSICS };
+enum BallState { BALL_IDLE, BALL_POWER, BALL_BEZIER, BALL_PHYSICS };
 BallState g_BallState = BALL_IDLE;
 
 // Flag para garantir que só ocorra um chute por rodada
@@ -261,6 +261,10 @@ bool g_HasKicked = false;
 
 // Flag para indicar que um gol foi marcado
 bool g_GoalScored = false;
+
+// Variáveis da Barra de Força
+float g_KickPower = 0.8f;       // Força atual
+float g_PowerDirection = 1.0f;  // 1.0 para encher, -1.0 para esvaziar
 
 // Velocidades da bola nos 3 eixos
 float g_BallVelX = 0.0f;
@@ -426,6 +430,8 @@ void ResetGame()
     g_BallState = BALL_IDLE;
     g_HasKicked = false;
     g_GoalScored = false;
+    g_KickPower = 0.8f;
+    g_PowerDirection = 1.0f;
     g_BallPosX = 0.0f;
     g_BallPosY = -0.6f; // Altura inicial
     g_BallPosZ = 0.0f;
@@ -829,9 +835,26 @@ int main(int argc, char* argv[])
         // =================================================================
 
         // Comportamento baseado no estado
-        if (g_BallState == BALL_BEZIER)
+        if (g_BallState == BALL_POWER)
         {
-            float kickSpeed = 1.5f; 
+            // A barra oscila no tempo
+            float baseSpeed = 1.0f;
+            float dynamicSpeed = baseSpeed + (g_KickPower * g_KickPower * 0.8f);
+            g_KickPower += g_PowerDirection * dynamicSpeed * deltaTime;
+
+            // Limites da força (0.8 = força mínima, 1.7 = força máxima)
+            if (g_KickPower >= 1.7f) {
+                g_KickPower = 1.7f;
+                g_PowerDirection = -1.0f; // Começa a esvaziar
+            } 
+            else if (g_KickPower <= 0.8f) {
+                g_KickPower = 0.8f;
+                g_PowerDirection = 1.0f; // Começa a encher
+            }
+        }
+        else if (g_BallState == BALL_BEZIER)
+        {
+            float kickSpeed = g_KickPower; 
             g_KickTime_t += deltaTime * kickSpeed;
 
             if (g_KickTime_t >= 1.0f)
@@ -1188,6 +1211,23 @@ int main(int argc, char* argv[])
         }
         // ---------------------------------------------------------------
 
+        // Desenha a barra de força na tela do jogador
+        if (g_BallState == BALL_POWER)
+        {
+            // Converte a força atual (0.8 a 1.7) para uma quantidade de barrinhas (0 a 20)
+            // Intervalo é 0.9f
+            int numBars = (int)(((g_KickPower - 0.8f) / 0.9f) * 20.0f);
+            
+            std::string powerStr = "FORCA: [";
+            for(int i = 0; i < 20; i++) {
+                if (i < numBars) powerStr += "|";
+                else powerStr += " ";
+            }
+            powerStr += "]";
+            
+            // Imprime no centro inferior da tela
+            TextRendering_PrintString(window, powerStr, -0.3f, -0.7f, 2.0f);
+        }
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
         TextRendering_ShowEulerAngles(window);
@@ -1945,7 +1985,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 // Função callback chamada sempre que o usuário movimenta a "rodinha" do mouse.
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    if (g_CameraState == CAM_BALL)
+    if (g_CameraState == CAM_BALL && g_BallState == BALL_IDLE)
     {
         // Em modo g_CameraState == CAM_BALL o scroll controla o pico do arco de Bézier.
         // Scroll up aumenta, scroll down diminui
@@ -2108,7 +2148,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     // Ajuste do ponto final da curva de Bézier com WASD em g_CameraState == CAM_BALL.
     // Teclas controlam a posição X e Y de P3.
     // acho que vai ficar muito dificil sem esses limites, testar depois
-    if (g_CameraState == CAM_BALL && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    if (g_CameraState == CAM_BALL && g_BallState == BALL_IDLE && (action == GLFW_PRESS || action == GLFW_REPEAT))
     {
         float step = 0.2f;
         if (key == GLFW_KEY_W)
@@ -2136,19 +2176,27 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 // Chutar a bola ao pressionar ESPAÇO
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
     {
+        // Sai do idle e trava a mira
         if (g_CameraState == CAM_BALL && g_BallState == BALL_IDLE && !g_HasKicked)
         {
-            g_HasKicked = true; // Ativa a trava para os próximos frames
-            g_BallState = BALL_BEZIER;
-            g_KickTime_t = 0.0f;
+            g_BallState = BALL_POWER;
+            g_KickPower = 0.8f;      
+            g_PowerDirection = 1.0f; 
 
-            // Salva os pontos da curva no momento do chute
+            // Salva os pontos da curva para travar o caminho
             g_P0 = glm::vec3(g_BallPosX, g_BallPosY, g_BallPosZ);
             g_P3 = glm::vec3(g_BezierTargetX, g_BezierTargetY, -13.0f);
             
             glm::vec3 dir = g_P3 - g_P0;
             g_P1 = g_P0 + dir * 0.25f + glm::vec3(0.0f, g_BezierArcHeight, 0.0f);
             g_P2 = g_P0 + dir * 0.75f + glm::vec3(0.0f, g_BezierArcHeight * 0.67f, 0.0f);
+        }
+        // Trava a força que estiver na barra e executa o chute
+        else if (g_BallState == BALL_POWER)
+        {
+            g_HasKicked = true; 
+            g_BallState = BALL_BEZIER;
+            g_KickTime_t = 0.0f;
         }
     }
 

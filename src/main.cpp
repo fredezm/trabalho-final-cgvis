@@ -1258,6 +1258,17 @@ int main(int argc, char* argv[])
         }
         // ---------------------------------------------------------------
 
+        int currentWidth, currentHeight;
+        glfwGetFramebufferSize(window, &currentWidth, &currentHeight);
+        
+        // Cálculo do fator de escala baseado na altura da janela para ajustar tamanho do texto
+        float scaleX = (float)currentWidth / 800.0f;
+        float scaleY = (float)currentHeight / 600.0f;
+
+        float dynamicScale = std::min(scaleX, scaleY);
+        float finalScale = 1.5f * dynamicScale;
+        float charWidth = TextRendering_CharWidth(window);
+
         // Desenha a barra de força na tela do jogador
         if (g_BallState == BALL_POWER)
         {
@@ -1272,8 +1283,11 @@ int main(int argc, char* argv[])
             }
             powerStr += "]";
             
+            float textWidth = powerStr.length() * charWidth * finalScale;
+            float posX = 0.5f - (textWidth / 2.0f);
+
             // Imprime no centro inferior da tela
-            TextRendering_PrintString(window, powerStr, -0.3f, -0.7f, 2.0f);
+            TextRendering_PrintString(window, powerStr, posX, -0.7f, finalScale);
         }
 
         // Desenha o placar
@@ -1281,11 +1295,16 @@ int main(int argc, char* argv[])
         snprintf(scoreStr, 50, "GOLS: %d / %d   TENTATIVAS: %d", g_Score, g_MaxAttempts, g_Attempts);
         
         // Imprime no canto superior esquerdo da tela
-        TextRendering_PrintString(window, scoreStr, -0.9f, 0.9f, 1.5f);
+        TextRendering_PrintString(window, scoreStr, -0.9f, 0.9f, finalScale);
 
         if (g_HasKicked && g_TimeSinceKick >= 4.0f)
         {
-            TextRendering_PrintString(window, "Pressione [Q] para o proximo chute", -0.4f, 0.0f, 1.5f);
+            std::string retryStr = "Pressione [Q] para o proximo chute";
+
+            float textWidth = retryStr.length() * charWidth * finalScale;
+            float posX = 0.0f - (textWidth / 2.0f);
+
+            TextRendering_PrintString(window, retryStr, posX, 0.0f, finalScale);
         }
 
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do

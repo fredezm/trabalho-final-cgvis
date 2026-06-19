@@ -262,6 +262,14 @@ bool g_HasKicked = false;
 // Flag para indicar que um gol foi marcado
 bool g_GoalScored = false;
 
+// Variáveis para o controle de pontuação
+int g_Score = 0;
+int g_Attempts = 0;
+int g_MaxAttempts = 10;
+
+// Tempo desde o início do chute
+float g_TimeSinceKick = 0.0f;
+
 // Variáveis da Barra de Força
 float g_KickPower = 0.8f;       // Força atual
 float g_PowerDirection = 1.0f;  // 1.0 para encher, -1.0 para esvaziar
@@ -424,6 +432,35 @@ void InitBezierShaderProgram()
 }
 // -----------------------------------------------------------------------
 
+// Função para resetar o estado do jogo para o início de uma nova rodada
+void ResetTurn()
+{
+    g_BallState = BALL_IDLE;
+    g_HasKicked = false;
+    g_GoalScored = false;
+    g_TimeSinceKick = 0.0f;
+    g_BallPosX = 0.0f;
+    g_BallPosY = -0.6f; 
+    g_BallPosZ = 0.0f;
+    g_BallVelX = 0.0f;
+    g_BallVelY = 0.0f;
+    g_BallVelZ = 0.0f;
+
+    g_KickTime_t = 0.0f;
+    g_BezierArcHeight = 0.0f;
+    g_BezierTargetX = 0.0f;
+    g_BezierTargetY = 0.0f;
+    g_KickPower = 0.8f;
+    g_PowerDirection = 1.0f;
+
+    g_CameraState = CAM_DEFAULT;
+    g_CameraTheta = 0.0f;
+    g_CameraPhi = 0.0f;
+    g_CameraDistance = 3.5f;
+
+    g_AngleX = 0.0f; g_AngleY = 0.0f; g_AngleZ = 0.0f;
+}
+
 void ResetGame()
 {
     // Reseta o estado da bola e física
@@ -433,17 +470,20 @@ void ResetGame()
     g_KickPower = 0.8f;
     g_PowerDirection = 1.0f;
     g_BallPosX = 0.0f;
-    g_BallPosY = -0.6f; // Altura inicial
+    g_BallPosY = -0.6f;
     g_BallPosZ = 0.0f;
     g_BallVelX = 0.0f;
     g_BallVelY = 0.0f;
     g_BallVelZ = 0.0f;
+    g_Score = 0;
+    g_Attempts = 0;
 
     // Reseta a curva de Bézier
     g_KickTime_t = 0.0f;
     g_BezierArcHeight = 0.0f;
     g_BezierTargetX = 0.0f;
     g_BezierTargetY = 0.0f;
+    g_ShowFullBezier = false;
 
     // Reseta a câmera para o padrão livre
     g_CameraState = CAM_DEFAULT;
@@ -451,8 +491,9 @@ void ResetGame()
     g_CameraPhi = 0.0f;
     g_CameraDistance = 3.5f;
     
-    // Reseta modificadores de corpo (caso use depois)
     g_AngleX = 0.0f; g_AngleY = 0.0f; g_AngleZ = 0.0f;
+
+    
 }
 
 //Teste de interseção entre esfera e plano.
@@ -803,11 +844,16 @@ int main(int argc, char* argv[])
         
         // Colisão entre bola e plano do chão, atualizando a posição e velocidade da bola.
         // FSM da bola
-        // Cálculo de tempo
+        // Cálculo de tempo.
         float currentTime = (float)glfwGetTime();
         float deltaTime = currentTime - lastTime;
         lastTime = currentTime;
         if (deltaTime > 0.05f) deltaTime = 0.05f;
+
+        // Conta o tempo após o chute.
+        if (g_HasKicked) {
+            g_TimeSinceKick += deltaTime;
+        }
         
         // =================================================================
         // LÓGICA DA BARREIRA (Posição e Orientação)
@@ -989,6 +1035,7 @@ int main(int argc, char* argv[])
             {
                 printf("          GOL!          \n");
                 g_GoalScored = true;
+                g_Score++;
             }
 
             // Colisão com rede
@@ -1228,6 +1275,19 @@ int main(int argc, char* argv[])
             // Imprime no centro inferior da tela
             TextRendering_PrintString(window, powerStr, -0.3f, -0.7f, 2.0f);
         }
+
+        // Desenha o placar
+        char scoreStr[50];
+        snprintf(scoreStr, 50, "GOLS: %d / %d   TENTATIVAS: %d", g_Score, g_MaxAttempts, g_Attempts);
+        
+        // Imprime no canto superior esquerdo da tela
+        TextRendering_PrintString(window, scoreStr, -0.9f, 0.9f, 1.5f);
+
+        if (g_HasKicked && g_TimeSinceKick >= 4.0f)
+        {
+            TextRendering_PrintString(window, "Pressione [Q] para o proximo chute", -0.4f, 0.0f, 1.5f);
+        }
+
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
         TextRendering_ShowEulerAngles(window);
@@ -2197,6 +2257,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
             g_HasKicked = true; 
             g_BallState = BALL_BEZIER;
             g_KickTime_t = 0.0f;
+            g_Attempts++;
         }
     }
 
@@ -2216,12 +2277,20 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         }
     }
 
-    // Reinicia o jogo
+    // Reinicia o jogo (Hard Reset)
     if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
     {
         ResetGame();
     }
 
+    // Próxima tentativa (Soft Reset)
+    if (key == GLFW_KEY_Q && action == GLFW_PRESS)
+    {
+        if (g_HasKicked && g_TimeSinceKick >= 4.0f)
+        {
+            ResetTurn();
+        }
+    }
 }
 
 // Definimos o callback para impressão de erros da GLFW no terminal

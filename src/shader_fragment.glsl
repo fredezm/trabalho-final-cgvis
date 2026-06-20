@@ -196,11 +196,14 @@ void main()
         // TextureImage7 = diffuse (corpo/uniforme), TextureImage8 = base color (detalhes).
         U = texcoords.x;
         V = texcoords.y;
-        vec3 diffuse = texture(TextureImage7, vec2(U, V)).rgb;
-        vec3 detail  = texture(TextureImage8, vec2(U, V)).rgb;
-        // Combina as duas texturas: difusa com leve overlay de detalhe
-        Kd0 = mix(diffuse, detail, 0.3);
-        Ks  = vec3(0.2); // pouco brilho especular
+        vec3 bodyColor = texture(TextureImage7, texcoords).rgb;
+        vec3 hairColor = texture(TextureImage8, texcoords).rgb;
+
+        float mask = dot(hairColor, vec3(0.333));
+
+        mask = smoothstep(0.05, 0.15, mask);
+
+        Kd0 = mix(bodyColor, hairColor, mask);
     }
 
     // Equação de iluminação (Phong por fragmento)

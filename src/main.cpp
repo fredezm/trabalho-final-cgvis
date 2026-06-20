@@ -914,17 +914,114 @@ int main(int argc, char* argv[])
                 g_BallVelY = exitVelocity.y;
                 g_BallVelZ = exitVelocity.z;
             }
-            else
+                else
             {
                 float t = g_KickTime_t;
                 float u = 1.0f - t;
-                glm::vec3 pos = u*u*u*g_P0 + 3.0f*u*u*t*g_P1 + 3.0f*u*t*t*g_P2 + t*t*t*g_P3;
-                
-                g_BallPosX = pos.x;
-                g_BallPosY = pos.y;
-                g_BallPosZ = pos.z;
-            }
-        }
+            
+                glm::vec3 pos =
+                    u*u*u*g_P0 +
+                    3.0f*u*u*t*g_P1 +
+                    3.0f*u*t*t*g_P2 +
+                    t*t*t*g_P3;
+            
+                float ballRadius = 0.5f;
+            
+                // ==========================
+                // AABBs da barreira
+                // ==========================
+            
+                float wallDefHalfWidth = 0.5706f + 0.05f;
+                float wallDefHalfDepth = 0.2372f + 0.05f;
+                float wallDefHalfDiag =
+                    sqrtf(wallDefHalfWidth * wallDefHalfWidth +
+                          wallDefHalfDepth * wallDefHalfDepth);
+            
+                float wallDefBaseY  = -1.1f;
+                float wallDefHeight = 1.74f;
+                float wallDefSep    = 0.6f;
+            
+                glm::vec3 wallDef1Pos =
+                    g_WallCenter - (g_WallRightDir * wallDefSep);
+            
+                glm::vec3 wallDef2Pos =
+                    g_WallCenter + (g_WallRightDir * wallDefSep);
+            
+                glm::vec3 wallDefMin[] =
+                {
+                    glm::vec3(
+                        wallDef1Pos.x - wallDefHalfDiag,
+                        wallDefBaseY,
+                        wallDef1Pos.z - wallDefHalfDiag),
+            
+                    glm::vec3(
+                        wallDef2Pos.x - wallDefHalfDiag,
+                        wallDefBaseY,
+                        wallDef2Pos.z - wallDefHalfDiag)
+                };
+            
+                glm::vec3 wallDefMax[] =
+                {
+                    glm::vec3(
+                        wallDef1Pos.x + wallDefHalfDiag,
+                        wallDefBaseY + wallDefHeight,
+                        wallDef1Pos.z + wallDefHalfDiag),
+            
+                    glm::vec3(
+                        wallDef2Pos.x + wallDefHalfDiag,
+                        wallDefBaseY + wallDefHeight,
+                        wallDef2Pos.z + wallDefHalfDiag)
+                };
+            
+                bool hitWall = false;
+            
+                for (int i = 0; i < 2; i++)
+                {
+                    if (TestIntersectionSphereAABB(
+                            pos,
+                            ballRadius,
+                            wallDefMin[i],
+                            wallDefMax[i]))
+                    {
+                        hitWall = true;
+                        break;
+                    }
+                }
+            
+                // ==========================
+                // Colisão durante a Bézier
+                // ==========================
+            
+                if (hitWall)
+                {
+                    g_BallPosX = pos.x;
+                    g_BallPosY = pos.y;
+                    g_BallPosZ = pos.z;
+            
+                    // Tangente da Bézier
+                    glm::vec3 tangent =
+                        3.0f*u*u*(g_P1 - g_P0)
+                      + 6.0f*u*t*(g_P2 - g_P1)
+                      + 3.0f*t*t*(g_P3 - g_P2);
+            
+                    tangent = glm::normalize(tangent);
+            
+                    float launchSpeed = 12.0f * g_KickPower;
+            
+                    g_BallVelX = tangent.x * launchSpeed;
+                    g_BallVelY = tangent.y * launchSpeed;
+                    g_BallVelZ = tangent.z * launchSpeed;
+            
+                    g_BallState = BALL_PHYSICS;
+                }
+                else
+                {
+                    g_BallPosX = pos.x;
+                    g_BallPosY = pos.y;
+                    g_BallPosZ = pos.z;
+                }
+    
+        }   }
         else if (g_BallState == BALL_PHYSICS)
         {
             // Aplica gravidade e movimento
@@ -1027,6 +1124,84 @@ int main(int argc, char* argv[])
                     break;
                 }
             } 
+
+            // Colisão com a barreira de defensores (Hitboxes Manuais, mesmo padrão AABB das traves)
+            // Bbox real de object_0 em goalkeeper.obj: X em [-0.5706, 0.5706] (já é meia-largura),
+            // Z em [-0.0913, 0.3831] (meia-profundidade em torno do centro ≈ 0.237), Y altura ≈ 1.735.
+            // Usamos metade da diagonal da base como "raio" horizontal da AABB, para dar folga suficiente
+            // mesmo quando o defensor está rotacionado (Matrix_Rotate_Y(g_WallAngle)) em relação aos eixos globais.
+            float wallDefHalfWidth = 0.5706f + 0.05f; // pequena margem de segurança contra tunneling em alta velocidade
+            float wallDefHalfDepth = 0.2372f + 0.05f;
+            float wallDefHalfDiag  = sqrtf(wallDefHalfWidth * wallDefHalfWidth + wallDefHalfDepth * wallDefHalfDepth);
+            float wallDefBaseY     = -1.1f;          // pés alinhados ao chão, igual ao plano
+            float wallDefHeight    = 1.74f;          // altura do modelo (eixo Y local)
+            float wallDefSep       = 0.6f;           // mesma separação usada ao desenhar (distEntreDefensores)
+
+            glm::vec3 wallDef1Pos = g_WallCenter - (g_WallRightDir * wallDefSep);
+            glm::vec3 wallDef2Pos = g_WallCenter + (g_WallRightDir * wallDefSep);
+
+            glm::vec3 wallDefMin[] = {
+                glm::vec3(wallDef1Pos.x - wallDefHalfDiag, wallDefBaseY, wallDef1Pos.z - wallDefHalfDiag),
+                glm::vec3(wallDef2Pos.x - wallDefHalfDiag, wallDefBaseY, wallDef2Pos.z - wallDefHalfDiag)
+            };
+            glm::vec3 wallDefMax[] = {
+                glm::vec3(wallDef1Pos.x + wallDefHalfDiag, wallDefBaseY + wallDefHeight, wallDef1Pos.z + wallDefHalfDiag),
+                glm::vec3(wallDef2Pos.x + wallDefHalfDiag, wallDefBaseY + wallDefHeight, wallDef2Pos.z + wallDefHalfDiag)
+            };
+
+            for (int i = 0; i < 2; i++)
+            {
+                glm::vec3 aabbMin = wallDefMin[i];
+                glm::vec3 aabbMax = wallDefMax[i];
+
+                if (TestIntersectionSphereAABB(ballCenter, ballRadius, aabbMin, aabbMax))
+                {
+                    // Encontra o ponto da superfície do defensor que está mais próximo da bola
+                    float px = std::max(aabbMin.x, std::min(ballCenter.x, aabbMax.x));
+                    float py = std::max(aabbMin.y, std::min(ballCenter.y, aabbMax.y));
+                    float pz = std::max(aabbMin.z, std::min(ballCenter.z, aabbMax.z));
+
+                    glm::vec3 closestPoint(px, py, pz);
+                    glm::vec3 distVec = ballCenter - closestPoint;
+                    float dist = glm::length(distVec);
+
+                    glm::vec3 normal(0.0f, 1.0f, 0.0f);
+
+                    // Empurra a bola fisicamente para fora até a borda (raio) encostar no defensor, calculando a normal real
+                    if (dist > 0.001f) {
+                        normal = distVec / dist;
+                        float penetration = ballRadius - dist;
+
+                        g_BallPosX += normal.x * penetration;
+                        g_BallPosY += normal.y * penetration;
+                        g_BallPosZ += normal.z * penetration;
+                    }
+                    // Caso extremo de alta velocidade onde a bola penetra completamente o defensor
+                    else
+                    {
+                        glm::vec3 velDir = glm::normalize(glm::vec3(g_BallVelX, 0.0f, g_BallVelZ));
+                        g_BallPosX -= velDir.x * ballRadius;
+                        g_BallPosZ -= velDir.z * ballRadius;
+                        normal = -velDir;
+                    }
+
+                    // Atualiza ballCenter para refletir o empurrão acima de imediato
+                    ballCenter = glm::vec3(g_BallPosX, g_BallPosY, g_BallPosZ);
+
+                    // Reflexão espelhada
+                    glm::vec3 currentVel(g_BallVelX, g_BallVelY, g_BallVelZ);
+                    glm::vec3 reflectedVel = glm::reflect(currentVel, normal);
+
+                    float restitution = 0.6f; // Defensor amortece mais o impacto do que a trave (menos rígido)
+
+                    g_BallVelX = reflectedVel.x * restitution;
+                    g_BallVelY = reflectedVel.y * restitution;
+                    g_BallVelZ = reflectedVel.z * restitution;
+
+                    break;
+                }
+            }
+
             glm::vec3 scoreMin(-3.7f, -1.0f, -14.3f); // Limite inferior (dentro do gol)
             glm::vec3 scoreMax( 3.7f,  1.6f, -13.6f); // Limite superior (dentro do gol)
 
@@ -1187,6 +1362,28 @@ int main(int argc, char* argv[])
         DrawDebugAABB(dbg_leftMin, dbg_leftMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
         DrawDebugAABB(dbg_rightMin, dbg_rightMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
         DrawDebugAABB(dbg_crossbarMin, dbg_crossbarMax, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+
+        // Renderiza hitboxes da barreira de defensores para debug (mesmos valores usados na colisão acima)
+        {
+            float dbg_wallHalfWidth = 0.5706f + 0.05f;
+            float dbg_wallHalfDepth = 0.2372f + 0.05f;
+            float dbg_wallHalfDiag  = sqrtf(dbg_wallHalfWidth * dbg_wallHalfWidth + dbg_wallHalfDepth * dbg_wallHalfDepth);
+            float dbg_wallBaseY     = -1.1f;
+            float dbg_wallHeight    = 1.74f;
+            float dbg_wallSep       = 0.6f;
+
+            glm::vec3 dbg_wallDef1Pos = g_WallCenter - (g_WallRightDir * dbg_wallSep);
+            glm::vec3 dbg_wallDef2Pos = g_WallCenter + (g_WallRightDir * dbg_wallSep);
+
+            glm::vec3 dbg_wallDef1Min(dbg_wallDef1Pos.x - dbg_wallHalfDiag, dbg_wallBaseY, dbg_wallDef1Pos.z - dbg_wallHalfDiag);
+            glm::vec3 dbg_wallDef1Max(dbg_wallDef1Pos.x + dbg_wallHalfDiag, dbg_wallBaseY + dbg_wallHeight, dbg_wallDef1Pos.z + dbg_wallHalfDiag);
+
+            glm::vec3 dbg_wallDef2Min(dbg_wallDef2Pos.x - dbg_wallHalfDiag, dbg_wallBaseY, dbg_wallDef2Pos.z - dbg_wallHalfDiag);
+            glm::vec3 dbg_wallDef2Max(dbg_wallDef2Pos.x + dbg_wallHalfDiag, dbg_wallBaseY + dbg_wallHeight, dbg_wallDef2Pos.z + dbg_wallHalfDiag);
+
+            DrawDebugAABB(dbg_wallDef1Min, dbg_wallDef1Max, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+            DrawDebugAABB(dbg_wallDef2Min, dbg_wallDef2Max, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), view, projection);
+        }
 
         // Renderiza hitboxes das redes para debug (copiar e colar valores para ajustar)
         // Variáveis para você ajustar o tamanho e posição da rede
@@ -1478,7 +1675,9 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6);
-    
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8);
+
     glUseProgram(0);
 }
 

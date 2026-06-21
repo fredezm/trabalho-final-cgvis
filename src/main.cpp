@@ -238,6 +238,9 @@ float g_BallPosZ = 0.0f;
 enum BallState { BALL_IDLE, BALL_POWER, BALL_BEZIER, BALL_PHYSICS };
 BallState g_BallState = BALL_IDLE;
 
+// Flag para controlar a tela inicial
+bool g_ShowStartScreen = true;
+
 // Flag para garantir que só ocorra um chute por rodada
 bool g_HasKicked = false;
 
@@ -449,6 +452,7 @@ void ResetGame()
     g_BallState = BALL_IDLE;
     g_HasKicked = false;
     g_GoalScored = false;
+    g_ShowStartScreen = true;
     g_KickPower = 0.8f;
     g_PowerDirection = 1.0f;
     g_BallPosX = 0.0f;
@@ -1516,43 +1520,57 @@ int main(int argc, char* argv[])
         float finalScale = 1.5f * dynamicScale;
         float charWidth = TextRendering_CharWidth(window);
 
-        // Desenha a barra de força na tela do jogador
-        if (g_BallState == BALL_POWER)
+
+        if (g_ShowStartScreen)
         {
-            // Converte a força atual (0.8 a 1.7) para uma quantidade de barrinhas (0 a 20)
-            // Intervalo é 0.9f
-            int numBars = (int)(((g_KickPower - 0.8f) / 0.9f) * 20.0f);
-            
-            std::string powerStr = "FORCA: [";
-            for(int i = 0; i < 20; i++) {
-                if (i < numBars) powerStr += "|";
-                else powerStr += " ";
-            }
-            powerStr += "]";
-            
-            float textWidth = powerStr.length() * charWidth * finalScale;
-            float posX = 0.5f - (textWidth / 2.0f);
-
-            // Imprime no centro inferior da tela
-            TextRendering_PrintString(window, powerStr, posX, -0.7f, finalScale);
-        }
-
-        // Desenha o placar
-        char scoreStr[50];
-        snprintf(scoreStr, 50, "GOLS: %d / %d   TENTATIVAS: %d", g_Score, g_MaxAttempts, g_Attempts);
-        
-        // Imprime no canto superior esquerdo da tela
-        TextRendering_PrintString(window, scoreStr, -0.9f, 0.9f, finalScale);
-
-        if (g_HasKicked && g_TimeSinceKick >= 4.0f)
-        {
-            std::string retryStr = "Pressione [Q] para o proximo chute";
-
-            float textWidth = retryStr.length() * charWidth * finalScale;
+            // Desenha apenas a mensagem de início centralizada
+            std::string startStr = "Aperte qualquer botao para iniciar";
+            float textWidth = startStr.length() * charWidth * finalScale;
             float posX = 0.0f - (textWidth / 2.0f);
-
-            TextRendering_PrintString(window, retryStr, posX, 0.0f, finalScale);
+            
+            TextRendering_PrintString(window, startStr, posX, 0.0f, finalScale);
         }
+        else
+        {
+            // Desenha a barra de força na tela do jogador
+            if (g_BallState == BALL_POWER)
+            {
+                // Converte a força atual (0.8 a 1.7) para uma quantidade de barrinhas (0 a 20)
+                // Intervalo é 0.9f
+                int numBars = (int)(((g_KickPower - 0.8f) / 0.9f) * 20.0f);
+                
+                std::string powerStr = "FORCA: [";
+                for(int i = 0; i < 20; i++) {
+                    if (i < numBars) powerStr += "|";
+                    else powerStr += " ";
+                }
+                powerStr += "]";
+                
+                float textWidth = powerStr.length() * charWidth * finalScale;
+                float posX = 0.5f - (textWidth / 2.0f);
+
+                // Imprime no centro inferior da tela
+                TextRendering_PrintString(window, powerStr, posX, -0.7f, finalScale);
+            }
+
+            // Desenha o placar
+            char scoreStr[50];
+            snprintf(scoreStr, 50, "GOLS: %d / %d   TENTATIVAS: %d", g_Score, g_MaxAttempts, g_Attempts);
+            
+            // Imprime no canto superior esquerdo da tela
+            TextRendering_PrintString(window, scoreStr, -0.9f, 0.9f, finalScale);
+
+            if (g_HasKicked && g_TimeSinceKick >= 4.0f)
+            {
+                std::string retryStr = "Pressione [Q] para o proximo chute";
+
+                float textWidth = retryStr.length() * charWidth * finalScale;
+                float posX = 0.0f - (textWidth / 2.0f);
+
+                TextRendering_PrintString(window, retryStr, posX, 0.0f, finalScale);
+            }
+        }
+
 
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
@@ -2364,6 +2382,17 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     //   Se apertar tecla shift+Z então g_AngleZ -= delta;
 
     float delta = 3.141592 / 16; // 22.5 graus, em radianos.
+
+    // Tela inicial
+    if (g_ShowStartScreen)
+    {
+        // Se qualquer tecla for pressionada, fecha a tela
+        if (action == GLFW_PRESS)
+        {
+            g_ShowStartScreen = false;
+        }
+        return;
+    }
 
     if (key == GLFW_KEY_X && action == GLFW_PRESS)
     {

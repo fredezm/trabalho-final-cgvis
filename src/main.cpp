@@ -238,8 +238,10 @@ float g_BallPosZ = 0.0f;
 enum BallState { BALL_IDLE, BALL_POWER, BALL_BEZIER, BALL_PHYSICS };
 BallState g_BallState = BALL_IDLE;
 
-// Flag para controlar a tela inicial
+// Flag para controlar as telas de início, vitória e derrota
 bool g_ShowStartScreen = true;
+bool g_ShowWinScreen = false;
+bool g_ShowGameOverScreen = false;
 
 // Flag para garantir que só ocorra um chute por rodada
 bool g_HasKicked = false;
@@ -249,8 +251,8 @@ bool g_GoalScored = false;
 
 // Variáveis para o controle de pontuação
 int g_Score = 0;
-int g_Attempts = 0;
-int g_MaxAttempts = 10;
+int g_TargetGoals = 3;       
+int g_RemainingAttempts = 5;
 
 // Tempo desde o início do chute
 float g_TimeSinceKick = 0.0f;
@@ -453,6 +455,8 @@ void ResetGame()
     g_HasKicked = false;
     g_GoalScored = false;
     g_ShowStartScreen = true;
+    g_ShowWinScreen = false;
+    g_ShowGameOverScreen = false;
     g_KickPower = 0.8f;
     g_PowerDirection = 1.0f;
     g_BallPosX = 0.0f;
@@ -462,7 +466,7 @@ void ResetGame()
     g_BallVelY = 0.0f;
     g_BallVelZ = 0.0f;
     g_Score = 0;
-    g_Attempts = 0;
+    g_RemainingAttempts = 5;
 
     // Reseta a curva de Bézier
     g_KickTime_t = 0.0f;
@@ -1520,15 +1524,42 @@ int main(int argc, char* argv[])
         float finalScale = 1.5f * dynamicScale;
         float charWidth = TextRendering_CharWidth(window);
 
+        // Telas de início, vitória e derrota
+        if (g_HasKicked && g_TimeSinceKick >= 4.0f && !g_ShowWinScreen && !g_ShowGameOverScreen)
+        {
+            if (g_Score >= g_TargetGoals) {
+                g_ShowWinScreen = true;
+            }
+            else if (g_RemainingAttempts <= 0) {
+                g_ShowGameOverScreen = true;
+            }
+        }
 
         if (g_ShowStartScreen)
         {
-            // Desenha apenas a mensagem de início centralizada
             std::string startStr = "Aperte qualquer botao para iniciar";
             float textWidth = startStr.length() * charWidth * finalScale;
-            float posX = 0.0f - (textWidth / 2.0f);
-            
-            TextRendering_PrintString(window, startStr, posX, 0.0f, finalScale);
+            TextRendering_PrintString(window, startStr, 0.0f - (textWidth / 2.0f), 0.0f, finalScale);
+        }
+        else if (g_ShowWinScreen)
+        {
+            std::string winStr = "VOCE VENCEU!";
+            float winWidth = winStr.length() * charWidth * finalScale;
+            TextRendering_PrintString(window, winStr, 0.0f - (winWidth / 2.0f), 0.1f, finalScale);
+
+            std::string resetStr = "Aperte qualquer tecla para recomecar";
+            float resetWidth = resetStr.length() * charWidth * finalScale;
+            TextRendering_PrintString(window, resetStr, 0.0f - (resetWidth / 2.0f), -0.1f, finalScale);
+        }
+        else if (g_ShowGameOverScreen)
+        {
+            std::string goStr = "GAME OVER";
+            float goWidth = goStr.length() * charWidth * finalScale;
+            TextRendering_PrintString(window, goStr, 0.0f - (goWidth / 2.0f), 0.1f, finalScale);
+
+            std::string resetStr = "Aperte qualquer tecla para tentar novamente";
+            float resetWidth = resetStr.length() * charWidth * finalScale;
+            TextRendering_PrintString(window, resetStr, 0.0f - (resetWidth / 2.0f), -0.1f, finalScale);
         }
         else
         {
@@ -1555,7 +1586,7 @@ int main(int argc, char* argv[])
 
             // Desenha o placar
             char scoreStr[50];
-            snprintf(scoreStr, 50, "GOLS: %d / %d   TENTATIVAS: %d", g_Score, g_MaxAttempts, g_Attempts);
+            snprintf(scoreStr, 50, "GOLS: %d / %d   TENTATIVAS: %d", g_Score, g_TargetGoals, g_RemainingAttempts);
             
             // Imprime no canto superior esquerdo da tela
             TextRendering_PrintString(window, scoreStr, -0.9f, 0.9f, finalScale);
@@ -2383,15 +2414,18 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 
     float delta = 3.141592 / 16; // 22.5 graus, em radianos.
 
-    // Tela inicial
-    if (g_ShowStartScreen)
+    // Tela inicial, vitória ou derrota
+    if (g_ShowStartScreen || g_ShowWinScreen || g_ShowGameOverScreen)
     {
-        // Se qualquer tecla for pressionada, fecha a tela
         if (action == GLFW_PRESS)
         {
-            g_ShowStartScreen = false;
+            if (g_ShowStartScreen) {
+                g_ShowStartScreen = false; 
+            } else {
+                ResetGame(); 
+            }
         }
-        return;
+        return; 
     }
 
     if (key == GLFW_KEY_X && action == GLFW_PRESS)
@@ -2554,7 +2588,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
             g_HasKicked = true; 
             g_BallState = BALL_BEZIER;
             g_KickTime_t = 0.0f;
-            g_Attempts++;
+            g_RemainingAttempts--;
         }
     }
 

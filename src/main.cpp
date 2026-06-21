@@ -220,31 +220,13 @@ glm::vec3 g_WallCenter   = glm::vec3(0.0f);
 glm::vec3 g_WallRightDir = glm::vec3(0.0f);
 float     g_WallAngle    = 0.0f;
 
-static const float WALL_DIST_FROM_BALL = 6.0f; // distância da barreira para a posição da bola
-static const float WALL_PLAYER_SEP = 1.6f; // distância entre os jogadores da barreira
-static const float WALL_SCALE = 1.5f; // escala dos defensores da barreira
-
-// Raio da cápsula de colisão de cada defensor (metade da largura escalada)
-static const float WALL_CAPSULE_RADIUS = 0.57f;   // 0.571 * WALL_SCALE / 2 ≈ 0.43; usamos 0.57 para folga
-static const float WALL_CAPSULE_HEIGHT = 2.6f;     // 1.74 * WALL_SCALE
-// Testa colisão de esfera contra um segmento vertical (cápsula infinita em Y).
-// Retorna true se a esfera (center, radius) penetra a cápsula do defensor em (cx, cz).
-bool TestSphereWallCapsule(glm::vec3 sphereCenter, float sphereRadius,
-                           float cx, float cz,
-                           float capsuleRadius, float capsuleYMin, float capsuleYMax)
-{
-    // Teste no plano XZ
-    float dx = sphereCenter.x - cx;
-    float dz = sphereCenter.z - cz;
-    float dist2D = sqrtf(dx*dx + dz*dz);
-    if (dist2D > sphereRadius + capsuleRadius) return false;
-    // Teste em Y (esfera deve sobrepor a faixa vertical da cápsula)
-    float sphereYMin = sphereCenter.y - sphereRadius;
-    float sphereYMax = sphereCenter.y + sphereRadius;
-    if (sphereYMax < capsuleYMin || sphereYMin > capsuleYMax) return false;
-    return true;
-}
-
+// variaveis do goleiro
+float g_GoalkeeperX      = 0.0f;    // Posição X atual
+float g_GoalkeeperSpeed  = 2.5f;    // Velocidade de movimento lateral
+int   g_GoalkeeperDir    = 1;       // 1 = Direita, -1 = Esquerda
+float g_GoalkeeperMinX   = -1.8f;   // Limite esquerdo (ajuste conforme a trave esquerda)
+float g_GoalkeeperMaxX   = 1.8f;    // Limite direito (ajuste conforme a trave direita)
+float g_GoalkeeperZ      = -12.7f;  // Pouco à frente da linha do gol (-13.0f)
 
 
 // Posição da bola no plano do chão (X,Z). 
@@ -855,6 +837,19 @@ int main(int argc, char* argv[])
             g_TimeSinceKick += deltaTime;
         }
         
+        // Movimentação do goleiro
+        g_GoalkeeperX += g_GoalkeeperDir * g_GoalkeeperSpeed * deltaTime;
+
+        // Inverte a direção ao tocar nos limites das traves
+        if (g_GoalkeeperX >= g_GoalkeeperMaxX) {
+            g_GoalkeeperX = g_GoalkeeperMaxX;
+            g_GoalkeeperDir = -1;
+        }
+        else if (g_GoalkeeperX <= g_GoalkeeperMinX) {
+            g_GoalkeeperX = g_GoalkeeperMinX;
+            g_GoalkeeperDir = 1;
+        }
+
         // =================================================================
         // LÓGICA DA BARREIRA (Posição e Orientação)
         // Dentro do loop principal (antes da física e da renderização):
@@ -1058,6 +1053,9 @@ int main(int argc, char* argv[])
             float postX = 4.0f;          // Distância do centro até as traves (ajuste para alinhar com o visual)
             float postThickness = 0.2f;  // Espessura da trave
             float crossbarHeight = 1.8f; // Altura do travessão (ajuste se bater no ar)
+            float gkWidth  = 1.2f;  // Largura  da Hitbox do goleiro
+            float gkHeight = 2.0f;  // Altura hitbox goleiro
+            float gkDepth  = 0.8f;  // Espessura hitbox goleiro
 
             glm::vec3 leftPostMin(-postX - postThickness, -1.1f, goalZ - postThickness);
             glm::vec3 leftPostMax(-postX + postThickness, crossbarHeight, goalZ + postThickness);
@@ -1124,14 +1122,55 @@ int main(int argc, char* argv[])
                     break;
                 }
             } 
+            // Colisão com o goleiro (Hitbox Manual)
+            // Define a caixa de colisão baseada na posição dinâmica g_GoalkeeperX
+            glm::vec3 gkMin(g_GoalkeeperX - gkWidth/2,  -1.1f,            g_GoalkeeperZ - gkDepth/2);
+            glm::vec3 gkMax(g_GoalkeeperX + gkWidth/2,  -1.1f + gkHeight, g_GoalkeeperZ + gkDepth/2);
 
-            // Colisão com a barreira de defensores (Hitboxes Manuais, mesmo padrão AABB das traves)
-            // Bbox real de object_0 em goalkeeper.obj: X em [-0.5706, 0.5706] (já é meia-largura),
-            // Z em [-0.0913, 0.3831] (meia-profundidade em torno do centro ≈ 0.237), Y altura ≈ 1.735.
-            // Usamos metade da diagonal da base como "raio" horizontal da AABB, para dar folga suficiente
-            // mesmo quando o defensor está rotacionado (Matrix_Rotate_Y(g_WallAngle)) em relação aos eixos globais.
-            float wallDefHalfWidth = 0.5706f + 0.05f; // pequena margem de segurança contra tunneling em alta velocidade
-            float wallDefHalfDepth = 0.2372f + 0.05f;
+            if (TestIntersectionSphereAABB(ballCenter, ballRadius, gkMin, gkMax)) 
+            {
+                // Encontra o ponto mais próximo na caixa para calcular a normal de colisão
+                float px = std::max(gkMin.x, std::min(ballCenter.x, gkMax.x));
+                float py = std::max(gkMin.y, std::min(ballCenter.y, gkMax.y));
+                float pz = std::max(gkMin.z, std::min(ballCenter.z, gkMax.z));
+                
+                glm::vec3 closestPoint(px, py, pz);
+                glm::vec3 distVec = ballCenter - closestPoint;
+                float dist = glm::length(distVec);
+                
+                glm::vec3 normal(0.0f, 0.0f, 1.0f); // Direção padrão de rebatimento (para frente do gol)
+                
+                if (dist > 0.001f) {
+                    normal = distVec / dist;
+                    float penetration = ballRadius - dist; 
+                    // Afasta a bola para não ficar presa dentro do goleiro
+                    g_BallPosX += normal.x * penetration;
+                    g_BallPosY += normal.y * penetration;
+                    g_BallPosZ += normal.z * penetration;
+                }
+                else{
+                    glm::vec3 velDir = glm::normalize(glm::vec3(g_BallVelX, 0.0f, g_BallVelZ));
+                    g_BallPosX -= velDir.x * ballRadius;
+                    g_BallPosZ -= velDir.z * ballRadius;
+                    normal = -velDir;
+                }
+                ballCenter = glm::vec3(g_BallPosX, g_BallPosY, g_BallPosZ);
+
+                // Aplica a reflexão do vetor velocidade
+                glm::vec3 currentVel(g_BallVelX, g_BallVelY, g_BallVelZ);
+                glm::vec3 reflectedVel = glm::reflect(currentVel, normal);
+                
+                float gkRestitution = 0.5f; // Elasticidade do impacto com o goleiro
+                
+                g_BallVelX = reflectedVel.x * gkRestitution;
+                g_BallVelY = reflectedVel.y * gkRestitution;
+                g_BallVelZ = reflectedVel.z * gkRestitution;
+            }            
+
+            // Colisão com a barreira de defensores 
+
+            float wallDefHalfWidth = 0.62f; 
+            float wallDefHalfDepth = 0.28f;
             float wallDefHalfDiag  = sqrtf(wallDefHalfWidth * wallDefHalfWidth + wallDefHalfDepth * wallDefHalfDepth);
             float wallDefBaseY     = -1.1f;          // pés alinhados ao chão, igual ao plano
             float wallDefHeight    = 1.74f;          // altura do modelo (eixo Y local)
@@ -1342,6 +1381,17 @@ int main(int argc, char* argv[])
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, GOALKEEPER);
             DrawVirtualObject("object_0");
+
+            // =================================================================
+            // DESENHAR GOLEIRO NA LINHA DO GOL
+            // =================================================================
+            model = Matrix_Translate(g_GoalkeeperX, -1.1f, g_GoalkeeperZ)
+                * Matrix_Scale(1.0f, 1.0f, 1.0f); 
+
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, GOALKEEPER);
+            DrawVirtualObject("object_0");
+
         }
         // Renderiza hitboxes das traves e travessao para debug (copiar e colar valores para ajustar)
         float dbg_goalZ = -13.0f;        

@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <random>
 
 // Headers abaixo são específicos de C++
 #include <set>
@@ -448,6 +449,13 @@ void ResetTurn()
     g_CameraDistance = 25.0f;
 
     g_AngleX = 0.0f; g_AngleY = 0.0f; g_AngleZ = 0.0f;
+
+    // Sorteio de posição da barreira
+    std::random_device rd;  
+    std::mt19937 gen(rd()); 
+    std::uniform_real_distribution<float> dis(-2.5f, 2.5f);
+
+    g_WallOffsetX = dis(gen);
 }
 
 void ResetGame()
@@ -486,7 +494,12 @@ void ResetGame()
     
     g_AngleX = 0.0f; g_AngleY = 0.0f; g_AngleZ = 0.0f;
 
+    // Sorteio de posição da barreira para o primeiro chute do jogo
+    std::random_device rd;  
+    std::mt19937 gen(rd()); 
+    std::uniform_real_distribution<float> dis(-2.5f, 2.5f); 
     
+    g_WallOffsetX = dis(gen);
 }
 
 // GLuint g_DebugVAO = 0;
@@ -2591,20 +2604,20 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
 
 
-    if (g_CameraState == CAM_WALL && (action == GLFW_PRESS || action == GLFW_REPEAT))
-    {
-        float step = 0.2f;
-        if (key == GLFW_KEY_D)
-        {
-            g_WallOffsetX -= step;
-            if (g_WallOffsetX < -6.0f) g_WallOffsetX = -6.0f; // maximo da esquerda
-        }
-        if (key == GLFW_KEY_A)
-        {
-            g_WallOffsetX += step;
-            if (g_WallOffsetX >  6.0f) g_WallOffsetX =  6.0f; // maximo da direita
-        }
-    }
+    // if (g_CameraState == CAM_WALL && (action == GLFW_PRESS || action == GLFW_REPEAT))
+    // {
+    //     float step = 0.2f;
+    //     if (key == GLFW_KEY_D)
+    //     {
+    //         g_WallOffsetX -= step;
+    //         if (g_WallOffsetX < -6.0f) g_WallOffsetX = -6.0f; // maximo da esquerda
+    //     }
+    //     if (key == GLFW_KEY_A)
+    //     {
+    //         g_WallOffsetX += step;
+    //         if (g_WallOffsetX >  6.0f) g_WallOffsetX =  6.0f; // maximo da direita
+    //     }
+    // }
 
     // Reinicia o jogo (Hard Reset)
     if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)

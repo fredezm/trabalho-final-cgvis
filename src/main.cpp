@@ -442,10 +442,10 @@ void ResetTurn()
     g_KickPower = 0.8f;
     g_PowerDirection = 1.0f;
 
-    g_CameraState = CAM_DEFAULT;
+    g_CameraState = CAM_AERIAL;
     g_CameraTheta = 0.0f;
-    g_CameraPhi = 0.0f;
-    g_CameraDistance = 3.5f;
+    g_CameraPhi = M_PI_2;
+    g_CameraDistance = 25.0f;
 
     g_AngleX = 0.0f; g_AngleY = 0.0f; g_AngleZ = 0.0f;
 }
@@ -456,6 +456,7 @@ void ResetGame()
     g_BallState = BALL_IDLE;
     g_HasKicked = false;
     g_GoalScored = false;
+    g_TimeSinceKick = 0.0f;
     g_ShowStartScreen = true;
     g_ShowWinScreen = false;
     g_ShowGameOverScreen = false;
@@ -1511,9 +1512,17 @@ int main(int argc, char* argv[])
         {
             if (g_Score >= g_TargetGoals) {
                 g_ShowWinScreen = true;
+                g_CameraState = CAM_DEFAULT;
+                g_CameraTheta = 0.0f;
+                g_CameraPhi = 0.0f;
+                g_CameraDistance = 3.5f;
             }
             else if (g_RemainingAttempts <= 0) {
                 g_ShowGameOverScreen = true;
+                g_CameraState = CAM_DEFAULT;
+                g_CameraTheta = 0.0f;
+                g_CameraPhi = 0.0f;
+                g_CameraDistance = 3.5f;
             }
         }
 
@@ -2403,6 +2412,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         {
             if (g_ShowStartScreen) {
                 g_ShowStartScreen = false; 
+                g_CameraState = CAM_AERIAL; 
+                g_CameraPhi = M_PI_2;
+                g_CameraDistance = 25.0f;
             } else {
                 ResetGame(); 
             }
@@ -2549,8 +2561,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 // Chutar a bola ao pressionar ESPAÇO
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
     {
+        if (g_CameraState == CAM_AERIAL)
+        {
+            g_CameraState = CAM_BALL;
+        }
         // Sai do idle e trava a mira
-        if (g_CameraState == CAM_BALL && g_BallState == BALL_IDLE && !g_HasKicked)
+        else if (g_CameraState == CAM_BALL && g_BallState == BALL_IDLE && !g_HasKicked)
         {
             g_BallState = BALL_POWER;
             g_KickPower = 0.8f;      

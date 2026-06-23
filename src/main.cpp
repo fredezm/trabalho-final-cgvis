@@ -579,7 +579,7 @@ int main(int argc, char* argv[])
     // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
     // de pixels, e com título "INF01047 ...".
     GLFWwindow* window;
-    window = glfwCreateWindow(800, 600, "INF01047 - Seu Cartao - Seu Nome", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "FUI RAPTADO PELO ABEL BRAGA E AGORA SOU OBRIGADO A BATER FALTAS PELO INTERNACIONAL", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -647,8 +647,12 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/Net.001_color.png");   // TextureImage5
     LoadTextureImage("../../data/Net.001_alpha.png");   // TextureImage6
 
-    LoadTextureImage("../../data/RGB_f80cd3e98591498ebe42f2fd55080acf_short01_diffuse.png"); // TextureImage7 — corpo/uniforme defesa
-    LoadTextureImage("../../data/RGB_45e5fd0197b54093b86252868acf5166_1001_Base_Color.png"); // TextureImage8 — detalhes defesa
+    //LoadTextureImage("../../data/RGB_f80cd3e98591498ebe42f2fd55080acf_short01_diffuse.png"); // TextureImage7 — corpo/uniforme defesa (object_1)
+    //LoadTextureImage("../../data/RGB_45e5fd0197b54093b86252868acf5166_1001_Base_Color.png"); // TextureImage8 — detalhes defesa (object_1)
+    //LoadTextureImage("../../data/RGB_ec44cd734fe4425e9c02e49014d1d466_blue_eye.png"); // TextureImage9 — olhos (object_2)
+    LoadTextureImage( "../../data/tex_0020_0out.jpg" );      // TextureImage7 - Uniforme/Jersey
+    LoadTextureImage( "../../data/tex_0019_0out.jpg" );      // TextureImage8 - Pele/Corpo
+    LoadTextureImage( "../../data/default-grey.jpg" );       // TextureImage9 - Parte extra/cabelo
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
 
@@ -660,9 +664,10 @@ int main(int argc, char* argv[])
     ComputeNormals(&footballmodel);
     BuildTrianglesAndAddToVirtualScene(&footballmodel);
 
-    ObjModel goalkeepermodel("../../data/goalkeeper.obj");
+    ObjModel goalkeepermodel("../../data/JB8D7C8YWHEG1QC62TM93RA33.obj");
     ComputeNormals(&goalkeepermodel);
     BuildTrianglesAndAddToVirtualScene(&goalkeepermodel);
+    PrintObjModelInfo(&goalkeepermodel);
 
     ObjModel goalmodel("../../data/Soccergoal.obj");
     ComputeNormals(&goalmodel);
@@ -820,6 +825,8 @@ int main(int argc, char* argv[])
         #define GOAL_NET        5
         #define GOAL_POLE       6
         #define GOALKEEPER      7
+        #define GOALKEEPER_HAIR 8
+        #define GOALKEEPER_EXTRA 9
 
         // Desenhamos o plano do chão
         model = Matrix_Translate(0.0f,-1.1f,0.0f)
@@ -872,7 +879,7 @@ int main(int argc, char* argv[])
             
             // Calcula e armazena a posição centralizada da barreira com o offset do jogador
             g_WallCenter = ballPosPlane + (dirToGoalWall * wallDistance) + (g_WallRightDir * g_WallOffsetX);
-            g_WallCenter.y = -1.1f; // Alinhado ao chão
+            g_WallCenter.y = 0.15f; // Alinhado ao chão
 
             // Ângulo de rotação para os defensores encararem a bola
             g_WallAngle = atan2(dirToGoalWall.x, dirToGoalWall.z);
@@ -1371,30 +1378,37 @@ int main(int argc, char* argv[])
             // Defensor 1 (Esquerda)
             glm::vec3 def1Pos = g_WallCenter - (g_WallRightDir * distEntreDefensores);
             model = Matrix_Translate(def1Pos.x, def1Pos.y, def1Pos.z)
-                * Matrix_Rotate_Y(g_WallAngle)
-                * Matrix_Scale(1.0f, 1.0f, 1.0f); 
+                * Matrix_Rotate_Y(g_WallAngle + (-M_PI/2.0f))
+                * Matrix_Scale(0.85f, 0.85f, 0.85f); 
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, GOALKEEPER);
-            DrawVirtualObject("object_0");
+            DrawVirtualObject("Object_tex_0020_0out.jpg");   // corpo
+            glUniform1i(g_object_id_uniform, GOALKEEPER_HAIR);
+            DrawVirtualObject("Object_tex_0019_0out.jpg");   // rosto
 
             // Defensor 2 (Direita)
             glm::vec3 def2Pos = g_WallCenter + (g_WallRightDir * distEntreDefensores);
             model = Matrix_Translate(def2Pos.x, def2Pos.y, def2Pos.z)
-                * Matrix_Rotate_Y(g_WallAngle)
-                * Matrix_Scale(1.0f, 1.0f, 1.0f);
+                * Matrix_Rotate_Y(g_WallAngle + (-M_PI/2.0f))
+                * Matrix_Scale(0.85f, 0.85f, 0.85f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, GOALKEEPER);
-            DrawVirtualObject("object_0");
+            DrawVirtualObject("Object_tex_0020_0out.jpg");   // corpo
+            glUniform1i(g_object_id_uniform, GOALKEEPER_HAIR);
+            DrawVirtualObject("Object_tex_0019_0out.jpg");   // rosto
 
             // =================================================================
             // DESENHAR GOLEIRO NA LINHA DO GOL
             // =================================================================
-            model = Matrix_Translate(g_GoalkeeperX, -1.1f, g_GoalkeeperZ)
-                * Matrix_Scale(1.0f, 1.0f, 1.0f); 
+            model = Matrix_Translate(g_GoalkeeperX, 0.10f, g_GoalkeeperZ)
+                * Matrix_Rotate_Y(M_PI/2.0f)
+                * Matrix_Scale(0.85f, 0.85f, 0.85f); 
 
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, GOALKEEPER);
-            DrawVirtualObject("object_0");
+            DrawVirtualObject("Object_tex_0020_0out.jpg");   // corpo
+            glUniform1i(g_object_id_uniform, GOALKEEPER_HAIR);
+            DrawVirtualObject("Object_tex_0019_0out.jpg");   // rosto
 
         }
         // // Renderiza hitboxes das traves e travessao para debug (copiar e colar valores para ajustar)
@@ -1780,7 +1794,8 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage6"), 6);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8);
-
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage9"), 9);
+    
     glUseProgram(0);
 }
 

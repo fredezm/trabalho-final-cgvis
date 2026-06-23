@@ -28,6 +28,9 @@ uniform mat4 projection;
 #define GOAL_NET       5
 #define GOAL_POLE      6
 #define GOALKEEPER     7
+#define GOALKEEPER_FACE  8
+#define GOALKEEPER_DETAL 9
+
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -192,18 +195,17 @@ void main()
     }
     else if ( object_id == GOALKEEPER )
     {
-        // Usa coordenadas UV do arquivo OBJ.
-        // TextureImage7 = diffuse (corpo/uniforme), TextureImage8 = base color (detalhes).
+        // object_0 = corpo/uniforme. Usa coordenadas UV do arquivo OBJ.
         U = texcoords.x;
         V = texcoords.y;
-        vec3 bodyColor = texture(TextureImage7, texcoords).rgb;
-        vec3 hairColor = texture(TextureImage8, texcoords).rgb;
-
-        float mask = dot(hairColor, vec3(0.333));
-
-        mask = smoothstep(0.05, 0.15, mask);
-
-        Kd0 = mix(bodyColor, hairColor, mask);
+        Kd0 = texture(TextureImage7, vec2(U, V)).rgb; // RGB_45e... = corpo/uniforme
+    }
+    else if ( object_id == GOALKEEPER_FACE)
+    {
+        // object_1 = cabelo. Usa coordenadas UV do arquivo OBJ.
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage8, vec2(U, V)).rgb; // RGB_f80... = cabelo
     }
 
     // Equação de iluminação (Phong por fragmento)

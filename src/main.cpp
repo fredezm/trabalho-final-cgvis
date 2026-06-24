@@ -225,6 +225,10 @@ float g_WallOffsetX = 0.0f;
 glm::vec3 g_WallCenter   = glm::vec3(0.0f);
 glm::vec3 g_WallRightDir = glm::vec3(0.0f);
 float     g_WallAngle    = 0.0f;
+bool  g_WallWillJump  = false; // Define se a barreira vai pular nesta rodada (50% de chance)
+float g_WallJumpY     = 0.0f;  // Altura atual do pulo
+float g_WallJumpSpeed = 0.25f;  
+int   g_WallJumpDir   = 1;     // Direção: 1 = subindo, -1 = descendo
 
 // variaveis do goleiro
 float g_GoalkeeperX      = 0.0f;    // Posição X atual
@@ -457,8 +461,12 @@ void ResetTurn()
     std::random_device rd;  
     std::mt19937 gen(rd()); 
     std::uniform_real_distribution<float> dis(-2.5f, 2.5f);
+    std::uniform_real_distribution<float> probDis(0.0f, 1.0f);  
 
     g_WallOffsetX = dis(gen);
+    g_WallWillJump = (probDis(gen) <= 0.5f); // 50% de chance de ser true
+    g_WallJumpY = 0.0f;
+    g_WallJumpDir = 1;
 }
 
 void ResetGame()
@@ -503,6 +511,9 @@ void ResetGame()
     std::uniform_real_distribution<float> dis(-2.5f, 2.5f); 
     
     g_WallOffsetX = dis(gen);
+    g_WallWillJump = dis(gen) <= 0.5f; // 50% de chance de ser true
+    g_WallJumpY = 0.0f;
+    g_WallJumpDir = 1;
 }
 
 // GLuint g_DebugVAO = 0;
@@ -952,6 +963,7 @@ int main(int argc, char* argv[])
         // Movimentação do goleiro
         g_GoalkeeperX += g_GoalkeeperDir * g_GoalkeeperSpeed * deltaTime;
 
+
         // Inverte a direção ao tocar nos limites das traves
         if (g_GoalkeeperX >= g_GoalkeeperMaxX) {
             g_GoalkeeperX = g_GoalkeeperMaxX;
@@ -964,7 +976,22 @@ int main(int argc, char* argv[])
 
         // =================================================================
         // LÓGICA DA BARREIRA (Posição e Orientação)
-        // Dentro do loop principal (antes da física e da renderização):
+
+          if (g_WallWillJump && g_HasKicked) 
+        {
+            g_WallJumpY += g_WallJumpDir * g_WallJumpSpeed * deltaTime;
+            
+            // Limita a altura do pulo a 0.10f
+            if (g_WallJumpY >= 0.20f) {
+                g_WallJumpY = 0.20f;
+                g_WallJumpDir = -1; // Começa a cair
+            } 
+            else if (g_WallJumpY <= 0.0f) {
+                g_WallJumpY = 0.0f;
+                g_WallJumpDir = 1;  // Começa a subir de novo
+            }
+        }
+
         if (!g_HasKicked)
         {
             glm::vec3 goalPos(0.0f, 0.0f, -13.0f);
@@ -1044,7 +1071,7 @@ int main(int argc, char* argv[])
                     sqrtf(wallDefHalfWidth * wallDefHalfWidth +
                           wallDefHalfDepth * wallDefHalfDepth);
             
-                float wallDefBaseY  = -1.1f;
+                float wallDefBaseY  = -1.1f + g_WallJumpY;
                 float wallDefHeight = 1.74f;
                 float wallDefSep    = 0.6f;
             
@@ -1131,11 +1158,13 @@ int main(int argc, char* argv[])
         }   }
         else if (g_BallState == BALL_PHYSICS)
         {
+
             // Aplica gravidade e movimento
             g_BallVelY += -9.81f * deltaTime;   
             g_BallPosX += g_BallVelX * deltaTime;
             g_BallPosY += g_BallVelY * deltaTime; 
             g_BallPosZ += g_BallVelZ * deltaTime;
+            
             
             // Colisão com o Chão
             glm::vec3 ballCenter(g_BallPosX, g_BallPosY, g_BallPosZ);
@@ -1460,7 +1489,7 @@ int main(int argc, char* argv[])
 
             // Defensor 1 (Esquerda)
             glm::vec3 def1Pos = g_WallCenter - (g_WallRightDir * distEntreDefensores);
-            model = Matrix_Translate(def1Pos.x, def1Pos.y, def1Pos.z)
+            model = Matrix_Translate(def1Pos.x, def1Pos.y + g_WallJumpY, def1Pos.z)
                 * Matrix_Rotate_Y(g_WallAngle + (-M_PI/2.0f))
                 * Matrix_Scale(0.85f, 0.85f, 0.85f); 
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
@@ -1471,7 +1500,7 @@ int main(int argc, char* argv[])
 
             // Defensor 2 (Direita)
             glm::vec3 def2Pos = g_WallCenter + (g_WallRightDir * distEntreDefensores);
-            model = Matrix_Translate(def2Pos.x, def2Pos.y, def2Pos.z)
+            model = Matrix_Translate(def2Pos.x, def2Pos.y + g_WallJumpY, def2Pos.z)
                 * Matrix_Rotate_Y(g_WallAngle + (-M_PI/2.0f))
                 * Matrix_Scale(0.85f, 0.85f, 0.85f);
             glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));

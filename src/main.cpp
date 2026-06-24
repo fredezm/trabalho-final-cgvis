@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <random>
 
+
 // Headers abaixo são específicos de C++
 #include <set>
 #include <map>
@@ -49,6 +50,8 @@
 // Headers locais, definidos na pasta "include/"
 #include "utils.h"
 #include "matrices.h"
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
 
 #include "collisions.h"
 
@@ -698,6 +701,28 @@ int main(int argc, char* argv[])
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+    // -------------------------------------------------------------------------
+    // SETUP DE ÁUDIO (Coloque antes do loop de renderização)
+    // -------------------------------------------------------------------------
+    ma_engine engine;
+    ma_result audio_result = ma_engine_init(NULL, &engine);
+    if (audio_result != MA_SUCCESS) {
+        printf("Aviso: Falha ao inicializar o motor de áudio. O jogo rodará sem som.\n");
+    }
+
+    ma_sound backgroundMusic;
+    // Carrega o arquivo MP3 (ajuste o caminho para onde sua música estiver, ex: "../../data/som.mp3")
+    audio_result = ma_sound_init_from_file(&engine, "../../data/vemcomabanda.mp3", 0, NULL, NULL, &backgroundMusic);
+    
+    if (audio_result == MA_SUCCESS) {
+        // Ativa a repetição infinita (loop)
+        ma_sound_set_looping(&backgroundMusic, MA_TRUE); 
+        // Dá o play
+        ma_sound_start(&backgroundMusic); 
+    } else {
+        printf("Aviso: Falha ao carregar o arquivo MP3.\n");
+    }
+    // -------------------------------------------------------------------------
 
     // Marcamos o tempo do último frame para a simulação física independente de FPS
     float lastTime = (float)glfwGetTime();
@@ -716,7 +741,7 @@ int main(int argc, char* argv[])
         // Conversaremos sobre sistemas de cores nas aulas de Modelos de Iluminação.
         //
         //           R     G     B     A
-        glClearColor(0.9f, 0.9f, 1.0f, 1.0f);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
         // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
         // e também resetamos todos os pixels do Z-buffer (depth buffer).
@@ -796,7 +821,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -800.0f; // Posição do "far plane"
+        float farplane  = -200.0f; // Posição do "far plane"
 
         if (g_UsePerspectiveProjection)
         {
@@ -1723,7 +1748,8 @@ int main(int argc, char* argv[])
         // pela biblioteca GLFW.
         glfwPollEvents();
     }
-
+    ma_sound_uninit(&backgroundMusic);
+    ma_engine_uninit(&engine);
     // Finalizamos o uso dos recursos do sistema operacional
     glfwTerminate();
 

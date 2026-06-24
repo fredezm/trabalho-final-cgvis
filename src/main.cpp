@@ -1426,25 +1426,6 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, FOOTBALL);
         DrawVirtualObject("FootBall");
 
-    
-        model = Matrix_Translate(0.0f, -1.1f, -13.0f)
-            * Matrix_Scale(3.0f, 1.5f, 1.5f);
-
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, GOAL_POLE_IRON);
-        DrawVirtualObject("pole.001_BezierCurve.001_IronPole");
-
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, GOAL_POLE);
-        DrawVirtualObject("Pole_Cube.001_Pole");
-
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, GOAL_NET);
-        DrawVirtualObject("Net.001_Plane.003_Net");
-        glDisable(GL_BLEND);
-
         // =================================================================
         // DESENHAR BARREIRA na camera do goleiro ou da bola
         // =================================================================
@@ -1488,6 +1469,24 @@ int main(int argc, char* argv[])
             DrawVirtualObject("Object_tex_0019_0out.jpg");   // rosto
 
         }
+
+        model = Matrix_Translate(0.0f, -1.1f, -13.0f)
+            * Matrix_Scale(3.0f, 1.5f, 1.5f);
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_POLE_IRON);
+        DrawVirtualObject("pole.001_BezierCurve.001_IronPole");
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_POLE);
+        DrawVirtualObject("Pole_Cube.001_Pole");
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_NET);
+        DrawVirtualObject("Net.001_Plane.003_Net");
+        glDisable(GL_BLEND);
 
         // // Renderiza hitboxes das traves e travessao para debug (copiar e colar valores para ajustar)
         // float dbg_goalZ = -13.0f;        

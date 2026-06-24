@@ -30,6 +30,9 @@ uniform mat4 projection;
 #define GOALKEEPER     7
 #define GOALKEEPER_FACE  8
 #define GOALKEEPER_DETAL 9
+#define STADIUM_SEATS  10
+#define STADIUM_FIELD  11
+#define STADIUM_LIGHT  12
 
 uniform int object_id;
 
@@ -48,6 +51,10 @@ uniform sampler2D TextureImage5;
 uniform sampler2D TextureImage6;
 uniform sampler2D TextureImage7;  // goalkeeper — corpo/uniforme (diffuse)
 uniform sampler2D TextureImage8;  // goalkeeper — detalhes (base color)
+uniform sampler2D TextureImage9;  // goalkeeper — olhos
+uniform sampler2D TextureImage10; // estádio — assentos (seat_texture)
+uniform sampler2D TextureImage11; // estádio — campo (stadium_field)
+uniform sampler2D TextureImage12; // estádio — iluminação (Stadium_Light)
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -206,6 +213,24 @@ void main()
         U = texcoords.x;
         V = texcoords.y;
         Kd0 = texture(TextureImage8, vec2(U, V)).rgb; // RGB_f80... = cabelo
+    }
+    else if ( object_id == STADIUM_SEATS )
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage10, vec2(U, V)).rgb;
+    }
+    else if ( object_id == STADIUM_FIELD )
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage11, vec2(U, V)).rgb;
+    }
+    else if ( object_id == STADIUM_LIGHT )
+    {
+        U = texcoords.x;
+        V = texcoords.y;
+        Kd0 = texture(TextureImage12, vec2(U, V)).rgb;
     }
 
     // Equação de iluminação (Phong por fragmento)

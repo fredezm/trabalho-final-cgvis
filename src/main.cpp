@@ -653,12 +653,21 @@ int main(int argc, char* argv[])
     LoadTextureImage( "../../data/tex_0020_0out.jpg" );      // TextureImage7 - Uniforme/Jersey
     LoadTextureImage( "../../data/tex_0019_0out.jpg" );      // TextureImage8 - Pele/Corpo
     LoadTextureImage( "../../data/default-grey.jpg" );       // TextureImage9 - Parte extra/cabelo
+    LoadTextureImage( "../../data/seat_texture.png" ); // TextureImage10 - Cadeira
+    LoadTextureImage( "../../data/stadium_field.png" );  // textureImage11 - Grama
+    LoadTextureImage( "../../data/Stadium_Light.png" ); // textureImage12 - Luzes do estádio
+
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
 
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
+
+    ObjModel stadiummodel("../../data/uploads_files_2571967_Stadium.obj");
+    ComputeNormals(&stadiummodel);
+    BuildTrianglesAndAddToVirtualScene(&stadiummodel);
+    //PrintObjModelInfo(&stadiummodel);
 
     ObjModel footballmodel("../../data/FootBall.obj");
     ComputeNormals(&footballmodel);
@@ -667,7 +676,7 @@ int main(int argc, char* argv[])
     ObjModel goalkeepermodel("../../data/JB8D7C8YWHEG1QC62TM93RA33.obj");
     ComputeNormals(&goalkeepermodel);
     BuildTrianglesAndAddToVirtualScene(&goalkeepermodel);
-    PrintObjModelInfo(&goalkeepermodel);
+    //PrintObjModelInfo(&goalkeepermodel);
 
     ObjModel goalmodel("../../data/Soccergoal.obj");
     ComputeNormals(&goalmodel);
@@ -787,7 +796,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -100.0f; // Posição do "far plane"
+        float farplane  = -800.0f; // Posição do "far plane"
 
         if (g_UsePerspectiveProjection)
         {
@@ -827,14 +836,81 @@ int main(int argc, char* argv[])
         #define GOALKEEPER      7
         #define GOALKEEPER_HAIR 8
         #define GOALKEEPER_EXTRA 9
+        #define STADIUM_SEATS   10
+        #define STADIUM_FIELD   11
+        #define STADIUM_LIGHT   12
+
 
         // Desenhamos o plano do chão
         model = Matrix_Translate(0.0f,-1.1f,0.0f)
-              * Matrix_Scale(15.0f, 1.0f, 15.0f);
+              * Matrix_Scale(100.0f, 1.0f, 100.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
         
+         // Desenhamos o estádio
+        // Y = -1.11f (0.01 abaixo do plano original em -1.1f) para evitar z-fighting
+        // Z = +8.326f para centralizar o estádio (centro Z original em -8.326)
+        // Escala 0.15f para proporcionar ao campo de jogo (±15 unidades)
+        {
+            // Ajustando a escala para não engolir a câmera (ajuste se necessário)
+            float stadiumScale = 1.0f; 
+            glm::mat4 stadiumModel = Matrix_Translate(-1.0f, -1.11f, 8.326f)
+                                   * Matrix_Scale(stadiumScale, stadiumScale, stadiumScale)
+                                   * Matrix_Rotate_Y(-M_PI_2); // Rotaciona para alinhar com o plano do chão
+
+            glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(stadiumModel));
+
+            // Assentos (seats)
+            glUniform1i(g_object_id_uniform, STADIUM_SEATS);
+            DrawVirtualObject("Cube.033_Cube.012_seats");
+            DrawVirtualObject("Cube.034_Cube.013_seats");
+            DrawVirtualObject("Cube.035_Cube.014_seats");
+            DrawVirtualObject("Cube.036_Cube.016_seats");
+            DrawVirtualObject("Cube.037_Cube.019_seats");
+            DrawVirtualObject("Cube.038_Cube.020_seats");
+            DrawVirtualObject("Cube.039_Cube.021_seats");
+            DrawVirtualObject("Cube.040_Cube.022_seats");
+            DrawVirtualObject("Cube.041_Cube.023_seats");
+            DrawVirtualObject("Cube.042_Cube.036_seats");
+            DrawVirtualObject("Cube.043_Cube.050_seats");
+            DrawVirtualObject("Cube.044_Cube.051_plastic.001");
+            DrawVirtualObject("Cube.045_Cube.052_seats");
+            DrawVirtualObject("Cube.046_Cube.053_seats");
+            DrawVirtualObject("Cube.047_Cube.054_seats");
+            DrawVirtualObject("Cube.048_Cube.055_seats");
+            DrawVirtualObject("Cube.049_Cube.056_seats");
+            DrawVirtualObject("Cube.050_Cube.057_seats");
+            DrawVirtualObject("Cube.051_Cube.058_seats");
+            DrawVirtualObject("Cube.052_Cube.059_seats");
+            DrawVirtualObject("Cube.053_Cube.060_seats");
+            DrawVirtualObject("Cube.054_Cube.061_seats");
+            DrawVirtualObject("Cube.055_Cube.062_seats");
+            DrawVirtualObject("Cube.056_Cube.063_plastic.001");
+
+            // Campo do estádio (green_field / grassy)
+            glUniform1i(g_object_id_uniform, STADIUM_FIELD);
+            DrawVirtualObject("Plane.003_Plane.011_field");
+            DrawVirtualObject("Plane.004_Plane.012_green_field");
+            DrawVirtualObject("Plane.013_Plane.016_green_field");
+            DrawVirtualObject("Plane.008_Plane.024_grassy"); // Grama do entorno
+
+            // Iluminação do estádio
+            glUniform1i(g_object_id_uniform, STADIUM_LIGHT);
+            DrawVirtualObject("Cylinder55.004_Cylinder55.004_Stadium_light");
+            DrawVirtualObject("Cylinder55.005_Cylinder55.005_Stadium_light");
+            DrawVirtualObject("Cylinder55.006_Cylinder55.006_Stadium_light");
+            DrawVirtualObject("Cylinder55.007_Cylinder55.007_Stadium_light");
+            
+            // Opcional: Renderizar o concreto das arquibancadas (usando o shader do plano/chão)
+            glUniform1i(g_object_id_uniform, PLANE);
+            DrawVirtualObject("Cube.044_Cube.051_concrete");
+            DrawVirtualObject("Cube.056_Cube.063_concrete");
+            DrawVirtualObject("Plane.007_Plane.013_concrete");
+            DrawVirtualObject("Plane.009_Plane.015_concrete");
+            DrawVirtualObject("Plane.014_Plane.020_concrete");
+            DrawVirtualObject("Plane.015_Plane.021_concrete");
+        }
         // Colisão entre bola e plano do chão, atualizando a posição e velocidade da bola.
         // FSM da bola
         // Cálculo de tempo.
@@ -875,7 +951,7 @@ int main(int argc, char* argv[])
             // Vetor perpendicular para o deslocamento lateral
             g_WallRightDir = glm::vec3(-dirToGoalWall.z, 0.0f, dirToGoalWall.x);
 
-            float wallDistance = 4.0f; // Distância fixa da barreira até a bola
+            float wallDistance = 5.0f; // Distância fixa da barreira até a bola
             
             // Calcula e armazena a posição centralizada da barreira com o offset do jogador
             g_WallCenter = ballPosPlane + (dirToGoalWall * wallDistance) + (g_WallRightDir * g_WallOffsetX);
@@ -1350,6 +1426,25 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, FOOTBALL);
         DrawVirtualObject("FootBall");
 
+    
+        model = Matrix_Translate(0.0f, -1.1f, -13.0f)
+            * Matrix_Scale(3.0f, 1.5f, 1.5f);
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_POLE_IRON);
+        DrawVirtualObject("pole.001_BezierCurve.001_IronPole");
+
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_POLE);
+        DrawVirtualObject("Pole_Cube.001_Pole");
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, GOAL_NET);
+        DrawVirtualObject("Net.001_Plane.003_Net");
+        glDisable(GL_BLEND);
+
         // =================================================================
         // DESENHAR BARREIRA na camera do goleiro ou da bola
         // =================================================================
@@ -1393,24 +1488,6 @@ int main(int argc, char* argv[])
             DrawVirtualObject("Object_tex_0019_0out.jpg");   // rosto
 
         }
-
-        model = Matrix_Translate(0.0f, -1.1f, -13.0f)
-            * Matrix_Scale(3.0f, 1.5f, 1.5f);
-
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, GOAL_POLE_IRON);
-        DrawVirtualObject("pole.001_BezierCurve.001_IronPole");
-
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, GOAL_POLE);
-        DrawVirtualObject("Pole_Cube.001_Pole");
-
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glUniformMatrix4fv(g_model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, GOAL_NET);
-        DrawVirtualObject("Net.001_Plane.003_Net");
-        glDisable(GL_BLEND);
 
         // // Renderiza hitboxes das traves e travessao para debug (copiar e colar valores para ajustar)
         // float dbg_goalZ = -13.0f;        
@@ -1796,7 +1873,9 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage7"), 7);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage8"), 8);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage9"), 9);
-    
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage10"), 10);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage11"), 11);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage12"), 12);
     glUseProgram(0);
 }
 

@@ -24,9 +24,8 @@ O uso de IA em nosso trabalho consistiu, principalmente, em discussões para tir
 <img width="682" height="542" alt="Image" src="https://github.com/user-attachments/assets/8b357c4a-d023-4a7c-9364-ecba5c7ff1ef" />
 ## Manual de utilização da aplicação
 
-	Câmera top down \- Teclas ´WASD´ para mover bola.
-
-	Câmera terceira pessoa: Teclas ´WASD´ posicionam o ponto final da curva de bézier. ´Scroll Up´ e ´Scroll Down´ alteram a curva da bola. Tecla ´Espaço´ chuta a bola. Tecla ´Q´ para passar para a próxima rodada (quando o prompt aparecer).
+Câmera top down \- Teclas ´WASD´ para mover bola.
+Câmera terceira pessoa: Teclas ´WASD´ posicionam o ponto final da curva de bézier. ´Scroll Up´ e ´Scroll Down´ alteram a curva da bola. Tecla ´Espaço´ chuta a bola. Tecla ´Q´ para passar para a próxima rodada (quando o prompt aparecer).
 
 ## Passos necessários para compilação e execução da aplicação;
 

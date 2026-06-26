@@ -2,13 +2,13 @@
 
 ## Integrantes da dupla
 
-\- \*\*Aluno 1 \- Nome\*\*: \<mark\>\`Frederico Zucchetti Mattiello\`\</mark\>
+Aluno 1 \- Nome: Frederico Zucchetti Mattiello
 
-\- \*\*Aluno 1 \- Cartão UFRGS\*\*: \<mark\>\`581041\`\</mark\>
+Aluno 1  \- Cartão UFRGS: 581041
 
-\- \*\*Aluno 2 \- Nome\*\*: \<mark\>\`André Gatti Wolff\`\</mark\>
+Aluno 2 \- Nome: André Gatti Wolff
 
-\- \*\*Aluno 2 \- Cartão UFRGS\*\*: \<mark\>\`578039\`\</mark\>
+Aluno 2 \- Cartão UFRGS: 578039
 
 ## Aplicação Desenvolvida
 

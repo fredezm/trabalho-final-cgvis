@@ -22,6 +22,7 @@ O uso de IA em nosso trabalho consistiu, principalmente, em discussões para tir
 
 <img width="676" height="544" alt="Image" src="https://github.com/user-attachments/assets/dcc4f7b1-fd2e-486e-8824-1ccbd38fda5b" />
 <img width="682" height="542" alt="Image" src="https://github.com/user-attachments/assets/8b357c4a-d023-4a7c-9364-ecba5c7ff1ef" />
+
 ## Manual de utilização da aplicação
 
 Câmera top down \- Teclas ´WASD´ para mover bola.
